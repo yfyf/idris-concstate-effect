@@ -1,4 +1,4 @@
-module Main
+module LockLang
 
 import Effect.State
 import Effect.Exception
@@ -13,6 +13,18 @@ interpTy TyInt       = Int
 interpTy TyBool      = Bool
 interpTy TyUnit      = ()
 interpTy (TyFun s t) = interpTy s -> interpTy t
+
+-- STUBS ----
+data IORef : Type -> Type where
+    MkIORef : a -> IORef a
+data Lock = MkLock
+--------------
+
+data ResState = RState Nat -- number of times it has been locked.
+                       Ty; -- Type of resource
+
+data Resource : ResState -> Type where
+   MkResource : (IORef (interpTy a)) -> Lock -> (Resource (RState n a))
 
 using (G : Vect Ty n)
 
@@ -50,67 +62,37 @@ using (G : Vect Ty n)
                         b' <- eval b
                         return (op a' b')
 
-  infix 5 :=
-
-  data LockL    : Vect Ty n -> Ty -> Type where
-       Let    : Expr G t -> LockL (t :: G) u -> LockL G u
-       (:=)   : HasType i G t -> Expr G t -> LockL G t
-       Print  : Expr G TyInt -> LockL G TyUnit
-       For    : LockL G i -> -- initialise
-                LockL G TyBool -> -- test
-                LockL G x -> -- increment
-                LockL G t -> -- body
-                LockL G TyUnit
-       (>>=)  : LockL G a -> (interpTy a -> LockL G b) -> LockL G b
-       Return : Expr G t -> LockL G t
-
+  data LockL : Vect Ty n -> Vect ResState rslin -> Vect ResState rslout -> Ty -> Type where
+        {}
+-- OLD CODE
+--       (>>=): LockL G rsin rsfoo a -> (interpTy a -> LockL G rsfoo rsout b) -> LockL G rsin rsout b
+--       Return: Expr G t -> LockL G [] [] t
+--       Let    : Expr G t -> LockL (t :: G) u -> LockL G u
 
   --total
-  interp : LockL G t -> Eff IO [STATE (Env G), STDIO] (interpTy t)
-  interp (Print e) = do val <- eval e
-                        putStrLn (show val)
-  interp (v := e) = do val <- eval e
-                       State.update (\env => Main.update v env val)
-                       return val
-  interp (Let e b) = do a <- eval e
-                        -- @TODO: why doesn't updateM work here?
-                        -- updateM ((::) a)
-                        env <- get
-                        putM (a :: env)
-                        val <- interp b
-                        -- @TODO: same here
-                        -- updateM tail
-                        (_ :: env') <- get
-                        putM env'
-                        return val
-  interp (imp >>= m) = do t <- interp imp
-                          interp (m t)
-  interp (Return exp) = eval exp
-  interp (For i test inc b) = do
-                            t <- interp i
-                            bool <- interp test
-                            if bool then do
-                                        interp b
-                                        interp (For inc test inc b)
-                                else return ()
+  interp : {rsin:Vect ResState rslin} -> {rsout:Vect ResState rslout} -> LockL G rsin rsout t -> EffM m
+            [STATE (Env G), STATE (rsin), STDIO]
+            [STATE (Env G), STATE (rsout), STDIO]
+            (interpTy t)
 
-  small : LockL [] TyUnit
-  small = Let (Val 42) (do
-              Print (Var stop)
-              stop := Op (+) (Var stop) (Val 1)
-              Print $ Var stop)
+  --OLD CODE
+  --interp (Let e b) = do a <- eval e
+  --                      -- @TODO: why doesn't updateM work here?
+  --                      -- updateM ((::) a)
+  --                      env <- get
+  --                      putM (a :: env)
+  --                      val <- interp b
+  --                      -- @TODO: same here
+  --                      -- updateM tail
+  --                      (_ :: env') <- get
+  --                      putM env'
+  --                      return val
+  --interp (imp >>= m) = do t <- interp imp
+  --                        interp (m t)
+  --interp (Return exp) = eval exp
 
-  decent : LockL [] TyUnit
-  decent = Let (Val 0) (
-            For (stop := (Val 1))
-                (Return (Op (<=) (Var stop) (Val 3)))
-                (stop := (Op (+) (Var stop) (Val 1)))
-                (Print (Var stop)))
-
-  main : IO ()
-  main = do
-    putStrLn "Small example:"
-    run [Main.Nil, (), ()] (interp small)
-    putStrLn "Let's count to 3:"
-    run [Main.Nil, (), ()] (interp decent)
-    return ()
+  --main : IO ()
+  --main = do
+  --  putStrLn "Small example:"
+  --  run [LockLang.Nil, (), ()] (interp small)
+  --  return ()
