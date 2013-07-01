@@ -17,7 +17,7 @@ getRef (resource ref l) = ref;
 getLock : (Resource r) -> Lock;
 getLock (resource ref l) = l;
 
-rlookup : {xs:Vect ResState rn} -> (p:ElemIs i (RState k ty) xs) -> 
+rlookup : {xs:Vect ResState rn} -> (p:ElemIs i (RState k ty) xs) ->
 	  (REnv xs) ->
 	  (IORef (interpTy ty));
 rlookup first (Extend (resource v l) env) = v;
@@ -30,14 +30,14 @@ llookup i env = getLock (envLookup i env);
 -- the right lock state.
 
 lockEnv : {i:Fin ln} -> {xs:Vect ResState ln} ->
-	  (ElemIs i (RState k ty) xs) -> 
+	  (ElemIs i (RState k ty) xs) ->
 	  (REnv xs) ->
 	  (REnv (update i (RState (S k) ty) xs));
 lockEnv first (Extend (resource ref l) env) = Extend (resource ref l) env;
 lockEnv (later p) (Extend r env) = Extend r (lockEnv p env);
 
 unlockEnv : {i:Fin un} -> {xs:Vect ResState un} ->
-	    (ElemIs i (RState (S k) ty) xs) -> 
+	    (ElemIs i (RState (S k) ty) xs) ->
 	    (REnv xs) ->
 	    (REnv (update i (RState k ty) xs));
 unlockEnv first (Extend (resource ref l) env) = Extend (resource ref l) env;
@@ -51,8 +51,8 @@ data Lang : (Vect ResState tin)->(Vect ResState tout)->Ty-># where
 
 -- Read from a shared variable. Must have the lock.
 
-   READ : {tins:Vect ResState tin} -> 
-	  {i:Fin tin} -> 
+   READ : {tins:Vect ResState tin} ->
+	  {i:Fin tin} ->
 	  (locked:ElemIs i (RState (S k) ty) tins) ->
 	  (Lang tins tins ty)
 
@@ -104,7 +104,7 @@ data Lang : (Vect ResState tin)->(Vect ResState tout)->Ty-># where
  | CHECK : {tins:Vect ResState tin} -> {touts: Vect ResState tout} ->
 	   (Maybe a) ->
 	   (ifJ:a -> (Lang tins touts ty)) ->
-	   (ifN:Lang tins touts ty) ->	   
+	   (ifN:Lang tins touts ty) ->
 	   (Lang tins touts ty)
  | CHOOSE : {tins:Vect ResState tin} -> {touts: Vect ResState tout} ->
 	    (Either a b) ->
@@ -115,8 +115,8 @@ data Lang : (Vect ResState tin)->(Vect ResState tout)->Ty-># where
             (IO ()) -> (Lang tins tins TyUnit)
  | RETURN : {tins:Vect ResState tin} ->
 	    (val:interpTy ty) -> (Lang tins tins ty)
- | BIND : {tins:Vect ResState tin} -> 
-	  {ts1:Vect ResState ts1n} -> 
+ | BIND : {tins:Vect ResState tin} ->
+	  {ts1:Vect ResState ts1n} ->
 	  {touts:Vect ResState tout} ->
 	  (code:Lang tins ts1 ty)->
 	  (k:(interpTy ty)->(Lang ts1 touts tyout))->
@@ -179,7 +179,7 @@ interp env (CHECK m j n) = interpCheck env m j n;
 interp env (CHOOSE m l r) = interpChoose env m l r;
 interp env (LOOP n body) = interpLoop env n body;
 -- Interpret the given process in a new thread, and carry on.
-interp env (FORK _ proc) 
+interp env (FORK _ proc)
        = do { fork (do { f <- interp env proc; return II; });
 	      return (MkPair env II);
 	    };
