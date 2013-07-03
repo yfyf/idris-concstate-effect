@@ -20,11 +20,11 @@ bound {n=S k} = fS bound;
 data Env : (R:#) -> (iR:R->#) -> (xs:Vect R n) -> # where
    Empty : {iR:R->#} -> (Env R iR VNil)
  | Extend : {r:R} -> {iR:R->#} -> {xs:Vect R n} -> 
-	    (res:(iR r)) -> (Env R iR xs) -> 
-	    (Env R iR (VCons r xs));
+        (res:(iR r)) -> (Env R iR xs) -> 
+        (Env R iR (VCons r xs));
 
 envLookup : {iR:R->#} -> {xs:Vect R n} -> 
-	    (i:Fin n) -> (Env R iR xs) -> (iR (vlookup i xs));
+        (i:Fin n) -> (Env R iR xs) -> (iR (vlookup i xs));
 envLookup fO (Extend t env) = t;
 envLookup (fS i) (Extend t env) = envLookup i env;
 
@@ -33,9 +33,9 @@ update fO v (VCons x xs) = VCons v xs;
 update (fS i) v (VCons x xs) = VCons x (update i v xs);
 
 updateEnv : {iR:R->#} -> {xs:Vect R n} -> {newR:R} ->
-	    (Env R iR xs) ->
-	    (i:Fin n) -> (iR newR) ->
-	    (Env R iR (update i newR xs));
+        (Env R iR xs) ->
+        (i:Fin n) -> (iR newR) ->
+        (Env R iR (update i newR xs));
 updateEnv (Extend t env) fO val = Extend val env;
 updateEnv (Extend t env) (fS i) val = Extend t (updateEnv env i val);
 

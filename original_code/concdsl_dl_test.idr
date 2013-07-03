@@ -2,14 +2,15 @@ include "concdsl_dl.idr";
 
 twoNats = VCons (RState O TyNat) (VCons (RState O TyNat) VNil);
 mkNatEnv : IO (REnv twoNats);
-mkNatEnv = do { r1 <- newIORef O;
-		l1 <- newLock 1;
-		r2 <- newIORef O;
-		l2 <- newLock 1;
-		return (Extend (resource r1 l1) 
-		       (Extend (resource r2 l2)
-		        Empty));
-	      };
+mkNatEnv = do {
+        r1 <- newIORef O;
+        l1 <- newLock 1;
+        r2 <- newIORef O;
+        l2 <- newLock 1;
+        return (Extend (resource r1 l1) 
+               (Extend (resource r2 l2)
+                Empty));
+          };
 
 one = S O; two = S one; three = S two; four = S three; five = S four;
 ten = mult two five;
@@ -34,11 +35,11 @@ count n pid
 
 threadcount : Lang twoNats twoNats TyUnit;
 threadcount = BIND (FORK (consUn (consUn nilUn)) (count ten "thread"))
-	(\u . count ten "__main");
+    (\u . count ten "__main");
 
 runTest : IO ();
 runTest = do { env <- mkNatEnv;
-	       putStrLn "Made Env";
-	       p <- interp env threadcount;
-	       return II;
-	};
+           putStrLn "Made Env";
+           p <- interp env threadcount;
+           return II;
+    };
