@@ -20,9 +20,6 @@ data ResEnv : (xs:Vect ResState n) -> Type where
 REnv : (xs:Vect ResState n) -> Type
 REnv xs = ResEnv xs
 
-data Thread: (Vect ResState n) -> Type where
-    MkThread: (xs: Vect ResState n) -> Thread xs
-
 data LockLift: (Vect ResState n) -> Type where
     MkLockLift: (xs:Vect ResState n) -> LockLift xs
 
@@ -68,35 +65,37 @@ using (rsin: Vect ResState n)
     envUnlock (Extend val k rsin) (fS i) (ElemAtIsThere foo) =
         Extend val k (envUnlock rsin i foo)
 
-    data ConcState: Effect where
+    data ConcState : (m: Type -> Type) -> Effect where
         -- Lock a shared variable.
         -- Must know that no lower priority items are locked, that is everything
         -- before 'ind' in rsin must be unlocked.
         Lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
               (PrevUnlocked ind tins) ->
-              ConcState (ResEnv rsin)
+              ConcState m (ResEnv rsin)
                         (ResEnv (Vect.replaceAt ind (RState (S k) ty) rsin))
                         ()
         -- Unlock a shared variable. Must know it is locked at least once.
         -- [TODO: why? it's safe to unlock an unlocked variable twice.]
         Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-              ConcState (ResEnv rsin)
+              ConcState m (ResEnv rsin)
                         (ResEnv (Vect.replaceAt ind (RState k ty) rsin))
                         ()
         -- Read from a locked variable.
         Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-            ConcState (ResEnv rsin) (ResEnv rsin) ty
+            ConcState m (ResEnv rsin) (ResEnv rsin) ty
         -- Write to a locked variable.
-        Write: (ind: Fin n) -> (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-            ConcState (ResEnv rsin) (ResEnv rsin) ()
+        Write: (ind: Fin n) ->
+                (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+                ConcState m (ResEnv rsin) (ResEnv rsin) ()
+
         -- We allow forking only when all resources are unlocked, which is
         -- guaranteed to be safe
-        -- [TODO: How do I express this better?]
---        Fork : (AllUnlocked rsin) -> (Eff m [CONC_STATE (ResEnv rsin)] ()) ->
-        Fork : (AllUnlocked rsin) ->
-            ConcState (ResEnv rsin) (ResEnv rsin) (Thread rsin)
+        Fork : {m: Type -> Type} -> (AllUnlocked rsin) ->
+                (Eff m [MkEff (ResEnv rsin) (ConcState m)] ()) ->
+                ConcState m (ResEnv rsin) (ResEnv rsin) ()
 
-    instance Handler ConcState m where
+
+    instance Handler (ConcState m) m where
         handle env (Write ind val prf) k = do
             let newenv = envWrite env ind val prf
             k newenv ()
@@ -109,6 +108,6 @@ using (rsin: Vect ResState n)
         handle env (Unlock ind prf) k = do
             let newenv = envUnlock env ind prf
             k newenv ()
-
-CONC_STATE : Type -> EFFECT
-CONC_STATE t = MkEff t ConcState
+        handle env (Fork prf eff) k = do
+            let newenv = env
+            k newenv ()
