@@ -100,7 +100,7 @@ using (G : Vect Ty n)
         LOCK : {tins:Vect ResState tin} ->
             (locked:Elem (RState ind k ty) tins) ->
             (priOK:Unlocked i tins) ->
-            (LockL (replaceAt i (RState ind (S k) ty) tins) TyUnit)
+            (LockL (Vect.replaceAt i (RState ind (S k) ty) tins) TyUnit)
 
         -- Unlock a shared variable. Must know it is locked at least once.
         -- TODO: why? it's safe to unlock an unlocked variable twice.
