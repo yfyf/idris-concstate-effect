@@ -12,7 +12,7 @@ data ConcEnv : (t: Type) -> (iR: t -> Type) -> (xs:Vect t n) -> Type where
    Empty : {iR: t -> Type} -> (ConcEnv t iR Vect.Nil)
    Extend : {r:t} -> {iR:t->Type} -> {xs:Vect t n} ->
         (res:(iR r)) -> (ConcEnv t iR xs) ->
-        (ConcEnv t iR (Vect.(::) r xs))
+        (ConcEnv t iR (r::xs))
 
 envLookup : {iR:t->Type} -> {xs:Vect t n} ->
         (i:Fin n) -> (ConcEnv t iR xs) -> (iR (index i xs))
