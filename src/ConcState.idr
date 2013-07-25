@@ -10,11 +10,6 @@ data ResState = RState Nat -- number of times it has been locked.
 data Resource : ResState -> Type where
      resource : (l:Nat) -> (r:ty) -> (Resource (RState l ty));
 
-data ResEnv : (xs:Vect ResState n) -> Type where
-   Empty : (ResEnv Vect.Nil)
-   Extend : {xs:Vect ResState n} -> (r:t) -> (k:Nat) -> (ResEnv xs) ->
-        (ResEnv (Vect.(::) (RState k t) xs))
-
 REnv : (xs:Vect ResState n) -> Type
 REnv xs = ConcEnv ResState Resource xs
 
