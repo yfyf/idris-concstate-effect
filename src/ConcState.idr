@@ -97,19 +97,23 @@ using (rsin: Vect ResState n)
                 ConcState m (REnv rsin) (REnv rsin) ()
 
 
-    instance Handler (ConcState m) m where
-        handle env (Write ind val prf) k = do
-            let newenv = envWrite env ind val prf
-            k newenv ()
-        handle env (Read ind prf) k = do
-            let val = envRead env ind prf
-            k env val
-        handle env (Lock ind prf_elem prf_unlocked) k = do
-            let newenv = envLock env ind prf_elem
-            k newenv ()
-        handle env (Unlock ind prf) k = do
-            let newenv = envUnlock env ind prf
-            k newenv ()
-        handle env (Fork prf eff) k = do
-            let newenv = env
-            k newenv ()
+CONCSTATE : Vect ResState n -> (Type -> Type) -> EFFECT
+CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
+
+instance (Applicative m) => Handler (ConcState m) m where
+    handle env (Write ind val prf) k = do
+        let newenv = envWrite env ind val prf
+        k newenv ()
+    handle env (Read ind prf) k = do
+        let val = envRead env ind prf
+        k env val
+    handle env (Lock ind prf_elem prf_unlocked) k = do
+        let newenv = envLock env ind prf_elem
+        k newenv ()
+    handle env (Unlock ind prf) k = do
+        let newenv = envUnlock env ind prf
+        k newenv ()
+    handle env (Fork prf prog) k = do
+        -- works only with a `let`, no idea why
+        let _ = run [env] prog
+        k env ()
