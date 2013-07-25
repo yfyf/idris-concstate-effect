@@ -16,7 +16,7 @@ data ResEnv : (xs:Vect ResState n) -> Type where
         (ResEnv (Vect.(::) (RState k t) xs))
 
 REnv : (xs:Vect ResState n) -> Type
-REnv xs = Env ResState Resource xs
+REnv xs = ConcEnv ResState Resource xs
 
 data LockLift: (Vect ResState n) -> Type where
     MkLockLift: (xs:Vect ResState n) -> LockLift xs
