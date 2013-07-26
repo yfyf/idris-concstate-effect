@@ -4,6 +4,8 @@ import Effects
 import Data.Vect
 import ConcEnv
 
+%default total
+
 data ResState = RState Nat -- number of times it has been locked.
                        Type; -- Type of resource
 
@@ -36,20 +38,20 @@ using (rsin: Vect ResState n)
 
     envWrite : (REnv rsin) -> (i: Fin n) -> (val: ty) ->
         (ElemAtIs i (RState (S k) ty) rsin) -> (REnv rsin)
-    envWrite (Extend (resource l r) rsin) f0 val ElemAtIsHere ?=
-        Extend (resource l val) rsin
+    envWrite (Extend (resource (S k) r) rsin) fO val ElemAtIsHere =
+        Extend (resource (S k) val) rsin
     envWrite (Extend r rsin) (fS i) val (ElemAtIsThere foo) =
         Extend r (envWrite rsin i val foo)
 
     envRead : (REnv rsin) -> (i: Fin n) ->
         (ElemAtIs i (RState (S k) ty) rsin) -> ty
-    envRead (Extend (resource _ r) _) f0 ElemAtIsHere ?= r
+    envRead (Extend (resource _ r) _) fO ElemAtIsHere = r
     envRead (Extend r rsin) (fS i) (ElemAtIsThere foo) = envRead rsin i foo
 
     envLock : (REnv rsin) -> (i: Fin n) ->
         (prf:ElemAtIs i (RState k ty) rsin) ->
         (REnv (Vect.replaceAt i (RState (S k) ty) rsin))
-    envLock (Extend (resource l r) rsin) f0 ElemAtIsHere ?=
+    envLock (Extend (resource l r) rsin) fO ElemAtIsHere =
         Extend (resource (S l) r) rsin
     envLock (Extend r rsin) (fS i) (ElemAtIsThere foo) =
         Extend r (envLock rsin i foo)
@@ -57,7 +59,7 @@ using (rsin: Vect ResState n)
     envUnlock : (REnv rsin) -> (i: Fin n) ->
         (prf:ElemAtIs i (RState (S k) ty) rsin) ->
         (REnv (Vect.replaceAt i (RState k ty) rsin))
-    envUnlock (Extend (resource (S l) r) rsin) f0 ElemAtIsHere ?=
+    envUnlock (Extend (resource (S l) r) rsin) fO ElemAtIsHere =
         Extend (resource l r) rsin
     envUnlock (Extend r rsin) (fS i) (ElemAtIsThere foo) =
         Extend r (envUnlock rsin i foo)
