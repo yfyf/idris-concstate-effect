@@ -1,7 +1,6 @@
 module ConcState
 
 import Effects
-import Data.Vect
 import ConcEnv
 
 %default total
@@ -114,3 +113,21 @@ instance (Applicative m) => Handler (ConcState m) m where
         -- works only with a `let`, no idea why
         let _ = run [env] prog
         k env ()
+
+
+write: (ind: Fin n) -> (val: ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+            Eff m [(CONCSTATE rsin m)] ()
+write i val el_prf = (Write i val el_prf)
+
+read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+            Eff m [(CONCSTATE rsin m)] ty
+read i el_prf = (Read i el_prf)
+
+lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
+          (PrevUnlocked ind rsin) ->
+          EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState (S k) ty) rsin) m] ()
+lock i el_prf unl_prf = (Lock i el_prf unl_prf)
+
+fork: {rsin: Vect ResState n} -> (prf: AllUnlocked rsin) -> (Eff m [CONCSTATE rsin m] ()) ->
+            Eff m [(CONCSTATE rsin m)] ()
+fork prf prog = (Fork prf prog)
