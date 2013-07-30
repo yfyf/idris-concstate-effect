@@ -69,7 +69,7 @@ using (rsin: Vect ResState n)
         -- Must know that no lower priority items are locked, that is everything
         -- before 'ind' in rsin must be unlocked.
         Lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
-              (PrevUnlocked ind tins) ->
+              (PrevUnlocked ind rsin) ->
               ConcState m (REnv rsin)
                         (REnv (Vect.replaceAt ind (RState (S k) ty) rsin))
                         ()
