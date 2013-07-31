@@ -135,3 +135,20 @@ unlock i el_prf = (Unlock i el_prf)
 fork: {rsin: Vect ResState n} -> (prf: AllUnlocked rsin) -> (Eff m [CONCSTATE rsin m] ()) ->
             Eff m [(CONCSTATE rsin m)] ()
 fork prf prog = (Fork prf prog)
+
+-----------------------------------------
+
+bump_first_val :  {rsin: Vect ResState k} ->
+    Eff m [CONCSTATE ((RState l Nat) :: rsin) m] Nat
+bump_first_val = do
+    lock fO ElemAtIsHere UnlockedHere
+    val <- read fO ElemAtIsHere
+    write fO (val + 1) ElemAtIsHere
+    val' <- read fO ElemAtIsHere
+    unlock fO ElemAtIsHere
+    return val'
+
+main : IO ()
+main = do
+    val <- run [(Extend (resource O O) Empty)] bump_first_val
+    print val
