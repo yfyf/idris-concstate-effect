@@ -128,6 +128,10 @@ lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
           EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState (S k) ty) rsin) m] ()
 lock i el_prf unl_prf = (Lock i el_prf unl_prf)
 
+unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+          EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState k ty) rsin) m] ()
+unlock i el_prf = (Unlock i el_prf)
+
 fork: {rsin: Vect ResState n} -> (prf: AllUnlocked rsin) -> (Eff m [CONCSTATE rsin m] ()) ->
             Eff m [(CONCSTATE rsin m)] ()
 fork prf prog = (Fork prf prog)
