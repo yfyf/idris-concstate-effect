@@ -2,6 +2,7 @@ module ConcState
 
 import Effects
 import ConcEnv
+import IO
 
 %default total
 
@@ -73,7 +74,6 @@ using (rsin: Vect n ResState)
                         (REnv (Vect.replaceAt ind (RState (S k) ty) rsin))
                         ()
         -- Unlock a shared variable. Must know it is locked at least once.
-        -- [TODO: why? it's safe to unlock an unlocked variable twice.]
         Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
               ConcState m (REnv rsin)
                         (REnv (Vect.replaceAt ind (RState k ty) rsin))
@@ -96,7 +96,7 @@ using (rsin: Vect n ResState)
 CONCSTATE : Vect n ResState -> (Type -> Type) -> EFFECT
 CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
 
-instance (Applicative m) => Handler (ConcState m) m where
+instance Handler (ConcState IO) IO where
     handle env (Write ind val prf) k = do
         let newenv = envWrite env ind val prf
         k newenv ()
@@ -111,7 +111,7 @@ instance (Applicative m) => Handler (ConcState m) m where
         k newenv ()
     handle env (Fork prf prog) k = do
         -- works only with a `let`, no idea why
-        let _ = run [env] prog
+        let _ = fork (run [env] prog)
         k env ()
 
 
@@ -132,24 +132,44 @@ unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
           EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState k ty) rsin) m] ()
 unlock i el_prf = (Unlock i el_prf)
 
-fork: {rsin: Vect n ResState} -> (prf: AllUnlocked rsin) -> (Eff m [CONCSTATE rsin m] ()) ->
-            Eff m [(CONCSTATE rsin m)] ()
-fork prf prog = (Fork prf prog)
+ffork: {rsin: Vect n ResState} -> (prf: AllUnlocked rsin) ->
+            Eff m [CONCSTATE rsin m] () -> Eff m [CONCSTATE rsin m] ()
+ffork prf prog = (Fork prf prog)
 
 -----------------------------------------
 
+%assert_total
 bump_first_val :  {rsin: Vect k ResState} ->
-    Eff m [CONCSTATE ((RState l Nat) :: rsin) m] Nat
+    Eff IO [(CONCSTATE ((RState l Nat) :: rsin) IO)] Nat
 bump_first_val = do
     lock fZ ElemAtIsHere UnlockedHere
     val <- read fZ ElemAtIsHere
+    --putStrLn ("val in thread:" ++ (show val))
     write fZ (val + 1) ElemAtIsHere
     val' <- read fZ ElemAtIsHere
+    --putStrLn ("val' in thread:" ++ (show val'))
     unlock fZ ElemAtIsHere
     return val'
 
 %assert_total
-main : IO ()
-main = do
-    val <- run [(Extend (resource Z Z) Empty)] bump_first_val
+bump_single_val : Eff IO [CONCSTATE [(RState Z Nat)] IO] Nat
+bump_single_val = do
+    lock fZ ElemAtIsHere UnlockedHere
+    val <- read fZ ElemAtIsHere
+    --putStrLn ("Bump single val initial " ++ (show val))
+    write fZ (val + 1) ElemAtIsHere
+    val' <- read fZ ElemAtIsHere
+    --putStrLn ("Bump single val final " ++ (show val'))
+    unlock fZ ElemAtIsHere
+    ffork (AllUnlAlmost AllUnlYes) (do _ <- bump_first_val; return ())
+    lock fZ ElemAtIsHere UnlockedHere
+    rez <- read fZ ElemAtIsHere
+    --putStrLn ("Result: " ++ (show rez))
+    unlock fZ ElemAtIsHere
+    return rez
+
+%assert_total
+Main.main : IO ()
+Main.main = do
+    val <- run [(Extend (resource Z Z) Empty)] bump_single_val
     print val
