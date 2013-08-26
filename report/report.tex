@@ -1,0 +1,35 @@
+\documentclass{article}
+
+\usepackage{url}
+\usepackage{fancyvrb}
+\usepackage{hyperref}
+
+\input{macros/conf.ltx}
+\input{macros/macros.ltx}
+\input{macros/library.ltx}
+
+\newcommand{\Idris}{\textsc{Idris}}
+\newcommand{\version}{0.9.9}
+\newcommand{\commit}{abcd}
+
+\title{(A failed attempt at) Using the Effects library in Idris to manage concurrent resources}
+\author{Ignas Vyšniauskas \\ \url{ignas.vysniauskas@student.uva.nl} \\
+    \\ \textit{Supervisor: Wouter Swierstra}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This is a report of my attempts to transform the eDSL for managing
+    concurrent resources in Idris described in \cite{cbconc-fi} by using the
+    Effects library described in \cite{effects-idr}.
+\end{abstract}
+
+\input{chapters/intro}
+\input{chapters/conclusions}
+
+\bibliographystyle{abbrv}
+\bibliography{literature.bib}
+
+\end{document}
