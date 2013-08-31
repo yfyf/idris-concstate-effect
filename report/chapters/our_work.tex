@@ -1,0 +1,258 @@
+\section{An effect for managing concurrent state}
+
+\subsection{Considerations}
+
+The main goal of my experiment was to implement an effect for
+concurrent resource management in order to make use of the Effects library, in
+particular, the comparability brought by it.
+
+Ideally, one would probably want to have an effect similar to \code{STATE}
+for managing an arbitrary resource associated with some state and also
+thread-safety sprinkled on top. This would be easy to do if we only had
+\emph{one} resource to manage, however since we are dealing with a set of
+resources (i.e. like in the CbC paper), this is not possible, at least in the
+current Effects library, because individual effects are not "aware" of any
+other effects, i.e. it's impossible to reference another effect from within the
+definition of one. This would be needed in order to ensure that resources are
+managed without deadlocks, since for this need to introduce an ordering among
+resources, which is impossible if the effects can't reference one another.
+
+Hence we are forced to have a combined state (or an "environment") for managing
+all the resources, though this is not much of an issue and is essentially the
+same approach which is taken in the CbC paper.
+
+Due to exactly the same reasons, although we might want to have forking as an
+effect of it's own (which, for example, executes an effectful program in a
+separate thread), this is not possible if we want to provide the safety
+guarantees. (And in fact forking induces additional and more fundamental
+issues, as we will see latter).
+
+
+\subsection{The predicates}
+
+As a consequence of the considerations, we model the management of a collection
+of resources in almost exactly the same way as it was done in the CbC paper.
+
+Our first ingredient in constructing the effect is the type for
+\emph{representing} the state of a resource, which will be used to in
+describing the various safety conditions.
+
+\begin{SaveVerbatim}{resstate}
+
+data ResState = RState Nat  -- number of times it has been locked.
+                       Type -- type of resource
+
+\end{SaveVerbatim}
+\useverb{resstate}
+
+We will represent a collection of resources that we want to manage safely as a
+vector, i.e. \code{Vect n ResState}.
+
+Next, come data predicates for ensuring, at the type-level, that certain
+conditions on the resources hold.
+
+\code{ElemAtIs} is a generic predicate for ensuring that the element at
+position $i$ of a vector of length $n \geq i$ equals to some element \code{el}.
+
+[Note: Here \code{Fin n} is a type for natural numbers up to $n$, with constructors
+\code{fZ} (for $0$) and \code{fS} (for successor).]
+
+\begin{SaveVerbatim}{elematis}
+
+data ElemAtIs: (i: Fin n) -> (el: a) -> Vect n a -> Type where
+  ElemAtIsHere:  {x: a} -> {xs : Vect n a} -> ElemAtIs fZ x (x::xs)
+  ElemAtIsThere: {i : Fin n} -> {x: a} -> {xs: Vect n a} ->
+                                ElemAtIs i x xs ->
+                                ElemAtIs (fS i) x (y::xs)
+
+\end{SaveVerbatim}
+\useverb{elematis}
+
+
+The \code{PrevUnlocked} predicate states that all resources up to and including
+some index are unlocked (i.e. lock count is 0).
+
+[Note: \code{Z} is the zero for the type \code{Nat}.]
+
+\begin{SaveVerbatim}{prevunlocked}
+
+data PrevUnlocked: (i: Fin n) -> (rsin: Vect n ResState) -> Type where
+   UnlockedHere: {x: ResState} -> {xs: Vect n ResState} ->
+                     PrevUnlocked fZ (x :: xs)
+   UnlockedThere: {i: Fin n} -> {xs: Vect n ResState} ->
+                                (PrevUnlocked i xs) ->
+                                (PrevUnlocked (fS i) ((RState Z t) :: xs))
+\end{SaveVerbatim}
+\useverb{prevunlocked}
+
+Finally, the \code{AllUnlocked} predicate specifies that all the resources in a
+collection are unlocked.
+
+
+\begin{SaveVerbatim}{allunlocked}
+
+data AllUnlocked : (xs: Vect n ResState) -> Type where
+    AllUnlYes : AllUnlocked []
+    AllUnlAlmost : {xs:Vect n ResState} -> AllUnlocked xs ->
+        AllUnlocked ((RState Z t) :: xs)
+
+\end{SaveVerbatim}
+\useverb{allunlocked}
+
+\subsection{The environment}
+
+In order to actually hold some data associated with the resource collection, we
+introduce a \code{Resource} constructor and a notion of an \emph{environment}.
+
+Since we didn't implement actual interfacing with some, say, OS level locking
+primitives, we choose the simplest possible \code{Resource} constructor which
+is good enough for modelling purposes, i.e. we simply pass the lock-count and
+resource values.
+
+\begin{SaveVerbatim}{resource}
+
+data Resource : ResState -> Type where
+     resource : (l:Nat) -> (r:ty) -> (Resource (RState l ty))
+
+\end{SaveVerbatim}
+\useverb{resource}
+
+Furthermore, we introduce a resource environment (\code{REnv}) for a collection
+of resources (i.e. \code{Vect n ResState}):
+
+\begin{SaveVerbatim}{renv}
+
+REnv : (xs:Vect n ResState) -> Type
+REnv xs = ConcEnv ResState Resource xs
+
+\end{SaveVerbatim}
+\useverb{renv}
+
+where \code{ConcEnv} is a generic environment constructor, defined as:
+
+[Note: we use the name \code{ConcEnv} instead of just \code{Env} to avoid
+confusion with environments associated with effects in the Effects library.]
+
+\begin{SaveVerbatim}{renv}
+data ConcEnv: (t: Type) -> (iR: t -> Type) -> (xs: Vect n t) -> Type where
+   Empty:  {iR: t -> Type} -> ConcEnv t iR []
+   Extend: {r: t} -> {iR: t -> Type} -> {xs: Vect n t} ->
+                     (res: (iR r)) -> ConcEnv t iR xs ->
+                     ConcEnv t iR (r::xs)
+\end{SaveVerbatim}
+\useverb{renv}
+
+where \code{iR} is an interpretation function, which assigns an actual resource
+(in our case, of type \code{Resource}) to the representation of it (in our
+case, of type \code{ResState}). Hence our \code{resource} constructor can be
+seen as an interpretation of the abstract resource state.
+
+Finally, we have functions to modify the environment: \code{envWrite},
+\code{envRead}, \code{envLock} an \code{envUnlock}.
+
+As an example, here is the definition of \code{envWrite}. Note that we are
+providing a proof that the element to which we are writing is locked and the
+input value type matches the resource value type.
+
+\begin{SaveVerbatim}{envwrite}
+
+    envWrite : {rsin: Vect n ResState} -> (REnv rsin) ->
+                    (i: Fin n) -> (val: ty) ->
+                    (ElemAtIs i (RState (S k) ty) rsin) ->
+                    (REnv rsin)
+    envWrite (Extend (resource (S k) r) rsin) fZ val ElemAtIsHere =
+        Extend (resource (S k) val) rsin
+    envWrite (Extend r rsin) (fS i) val (ElemAtIsThere foo) =
+        Extend r (envWrite rsin i val foo)
+
+\end{SaveVerbatim}
+\useverb{envwrite}
+
+\subsection{The effect}
+
+We finally arrive at the actual definition of the \code{ConcState} effect.
+
+For reasons explained later, we parametrise \code{ConcState} over a
+computational context \code{m: Type -> Type}:
+
+\begin{verbatim}
+    data ConcState: (m: Type -> Type) -> Effect where
+\end{verbatim}
+
+The effect will have 5 actions: \code{Lock}, \code{Unlock}, \code{Read},
+\code{Write} and \code{Fork}.
+
+The first 4 definitions are rather straightforward and there is little to
+comment on: for each action we ask for a proof of necessary conditions to be
+provided explicitly and ensure that the resource state is updated accordingly.
+
+[Note: in all of the remaining code, the variable \code{rsin} is of type
+\code{Vect n ResState} (declared with the \code{using} notation of Idris).]
+
+\begin{verbatim}
+-- Lock a shared variable.
+-- Must know that no lower priority items are locked, that is everything
+-- before 'ind' in rsin must be unlocked.
+Lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
+      (PrevUnlocked ind rsin) ->
+      ConcState m (REnv rsin)
+                (REnv (replaceAt ind (RState (S k) ty) rsin))
+                ()
+-- Unlock a shared variable. Must know it is locked at least once.
+Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+      ConcState m (REnv rsin)
+                (REnv (replaceAt ind (RState k ty) rsin))
+                ()
+-- Read from a locked variable.
+Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+    ConcState m (REnv rsin) (REnv rsin) ty
+-- Write to a locked variable.
+Write: (ind: Fin n) ->
+        (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+        ConcState m (REnv rsin) (REnv rsin) ()
+\end{verbatim}
+
+However, figuring out the right type for \code{Fork} is more challenging and
+poses several questions. Since we are working with a functional programming
+language, we will want to pass a function to be executed in the new thread.
+However, in this setting we need to ensure that once the thread execution
+finishes, the resource states are the same as they were initially.
+
+[@TODO: explain that \code{CONCSTATE} and \code{ConcState} are defined with
+mutual recursion, by using:
+\begin{verbatim}
+CONCSTATE : Vect n ResState -> (Type -> Type) -> EFFECT
+CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
+\end{verbatim}
+]
+
+Hence, instead of an arbitrary function, we want to pass an effectful program,
+which leaves the state of resources unchanged. Furthermore, it would be problematic to
+meaningfully handle a return value of a thread, so we assume the functions
+output is a unit.
+
+A naive type for such a program is: \code{Eff m [CONCSTATE rsin m] ()}. We will
+use it for now and discuss problems raised by enforcing this type of programs
+only later.
+
+We can then define \code{Fork} as follows:
+
+\begin{verbatim}
+
+-- We allow forking only when all resources are unlocked, which is
+-- guaranteed to be safe
+Fork : {m: Type -> Type} -> (proof: AllUnlocked rsin) ->
+        (prog: Eff m [CONCSTATE rsin m] ()) ->
+        ConcState m (REnv rsin) (REnv rsin) ()
+
+\end{verbatim}
+
+
+\subsection{The handler(s)}
+
+@TODO: explain the main handler, talk about other possible handlers.
+
+\subsection{The problems}
+
+@TODO: talk about non-composability and why it is currently a limitation of the
+effects library.

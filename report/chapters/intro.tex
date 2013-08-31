@@ -1,68 +1,89 @@
-\section{Introduction}
+\section{Introduction, motivation and aims}
 
-In conventional programming languages, there is a clear distinction between
-\remph{types} and \remph{values}. For example, in Haskell~\cite{haskell-report},
-the following are types, representing integers, characters, lists of characters,
-and lists of any value respectively:
+\subsection{Motivation}
 
-\begin{itemize}
-\item \texttt{Int}, \texttt{Char}, \texttt{[Char]}, \texttt{[a]}
-\end{itemize}
+Concurrency is a concept which is very hard to simulate in our brains.
+Rephrasing my supervisor: if sequential programs have a linear state space of
+$O(n)$, then concurrent programs have an exponential state space of $O(2^n)$,
+which is perhaps the core issue.
 
-\noindent
-Correspondingly, the following values are examples of inhabitants of those types:
+Historically, either (unsafe) ad-hoc approaches have (and mostly still are)
+been used or formal models were created for proving the correctness of
+concurrent algorithms and then translated into an actual implementation.
 
-\begin{itemize}
-\item \texttt{42}, \texttt{'a'}, \texttt{"Hello world!"}, \texttt{[2,3,4,5,6]}
-\end{itemize}
+Naturally, both approaches are quite unsustainable and it is a shame that,
+despite having progressed research in the area quite a bit, most software
+systems are still handling concurrent resources "manually" (i.e. with e.g.
+minimal-to-none help from the compiler) in practice.
 
-\noindent
-In a language with \emph{dependent types}, however, the distinction is less
-clear.  
-Dependent types allow types to ``depend'' on values --- in other words,
-types are a \emph{first class} language construct and can be manipulated like
-any other value. The standard
-example is the type of lists of a given length\footnote{Typically, and perhaps
-confusingly, referred to in the dependently typed programming literature as
-``vectors''}, \texttt{Vect n a}, where \texttt{a} is the element type and
-\texttt{n} is the length of the list and can be an arbitrary
-term.
+Hence the initial aim of this project was to explore advances in programming
+language research which would help us solve these problems. This idea
+crystallised into an attempt to explore the power of Dependent Types, in
+particular, the way they are used in Idris and attempting to use ideas from
+previous work on concurrent resource handling~\cite{cbconc-fi} and combine them
+with a new approach~\cite{eff} to handling programs with side effects as
+implemented in the Effects~\cite{effects-idr} library of Idris.
 
-When types can contain values, and where those values describe properties (e.g.
-the length of a list)
-the type of a function can begin to describe its own properties. For example,
-concatenating two lists has the property that the resulting list's length is
-the sum of the lengths of the two input lists. We can therefore give the following type 
-to the  \texttt{app} function, which concatenates vectors: 
+\subsection{Dependent Types and type safety}
 
-\begin{SaveVerbatim}{appendv}
+Normally in programming languages types and values are kept completely
+distinct. The main benefit of this approach is that type inference is much
+simpler and, in fact, decidable.
 
-app : Vect n a -> Vect m a -> Vect (n + m) a
+However, this means that it is very hard or impossible to precisely
+describe some of the data structures and flows of your program. In a type
+system with dependent types, the distinction between values and types is
+blurred and hence in dependently typed programming languages types are
+first-class citizens~\cite[p.~3]{idris-tutorial} and can be manipulated as any
+other term.
+
+The bad side is that type checking becomes, in general, undecidable.
+
+The good part of this is that you can describe your data with "arbitrary"
+precision. A typical example of a data structure possible with dependent types
+is a fixed-length list, i.e. a vector. Which could be expressed as:
+
+\begin{SaveVerbatim}{vect}
+
+-- expressed as Haskell-style data-type: parametrised over a length and a type
+data Vect : Nat -> Type -> Type where
+  -- empty vector constructor, Z stands for 0
+  Nil  : Vect Z a
+  -- the standard cons operator, where `S` is the natural number successor operator
+  (::) : a -> Vect n a -> Vect (S n) a
 
 \end{SaveVerbatim}
-\useverb{appendv}
+\useverb{vect}
 
-\noindent
-This tutorial introduces \Idris{}, a general purpose functional 
-programming language with dependent types.
-The goal of the \Idris{} project is to build a dependently typed language suitable
-for verifiable \emph{systems} programming. To this end, \Idris{} is a compiled language
-which aims to generate efficient executable code. It also has a lightweight foreign
-function interface which allows easy interaction with external C libraries.
+which makes it possible to, e.g. describe the standard "list-type" functions
+such as \texttt{head} and appending very precisely:
 
-\subsection{Intended Audience}
+\begin{SaveVerbatim}{headtail}
 
-This tutorial is intended as a brief introduction to the language, and is aimed
-at readers already familiar with a functional language such as Haskell or
-OCaml. In particular, a certain amount of familiarity with Haskell syntax is
-assumed, although most concepts will at least be explained briefly.  The reader
-is also assumed to have some interest in using dependent types for writing and
-verifying systems software.
+-- ensure the vector is non-empty by matching the length as (S n)
+head : Vect (S n) a -> a
+head (x::xs) = x
 
-\subsection{Example Code}
+-- precisely describe the output vector length
+(++) : Vect m a -> Vect n a -> Vect (m + n) a
+(++) []      ys = ys
+(++) (x::xs) ys = x :: xs ++ ys
 
-This tutorial includes some example code, which has been tested with \Idris{} version
-\version{}. The files are available in the \Idris{} distribution,
-so that you can try them out easily,
-under \texttt{tutorial/examples}. However, it is strongly recommended that you
-type them in yourself, rather than simply loading and reading them.
+\end{SaveVerbatim}
+\useverb{headtail}
+
+@TODO: improve/remove, this is super vague:
+
+In general, having Dependent Types allows parametrising types over any terms,
+which means one is able to create complicated data structures using the
+expressive type system.
+
+\subsection{Idris}
+
+Idris is a research language with Dependent Types influenced by Haskell, which
+tries to be a general purpose language aimed at systems programming (via easy
+interfacing with C, compilation to multiple backends (C, JavaScript, Java)).
+
+Since my goal was to solve a practical problem of making it easier to work with
+resources in a concurrent setting, Idris, due to its aims, seemed as a perfect
+experimentation platform.
