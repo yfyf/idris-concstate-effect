@@ -227,32 +227,100 @@ CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
 ]
 
 Hence, instead of an arbitrary function, we want to pass an effectful program,
-which leaves the state of resources unchanged. Furthermore, it would be problematic to
-meaningfully handle a return value of a thread, so we assume the functions
-output is a unit.
+which leaves the state of resources unchanged. Furthermore, it would be
+problematic to safely and usefully handle a return value of a thread, so we
+assume the functions output is a unit.
 
 A naive type for such a program is: \code{Eff m [CONCSTATE rsin m] ()}. We will
 use it for now and discuss problems raised by enforcing this type of programs
 only later.
 
 We can then define \code{Fork} as follows:
-
 \begin{verbatim}
-
 -- We allow forking only when all resources are unlocked, which is
 -- guaranteed to be safe
 Fork : {m: Type -> Type} -> (proof: AllUnlocked rsin) ->
         (prog: Eff m [CONCSTATE rsin m] ()) ->
         ConcState m (REnv rsin) (REnv rsin) ()
-
 \end{verbatim}
-
 
 \subsection{The handler(s)}
 
-@TODO: explain the main handler, talk about other possible handlers.
+Perhaps the most beautiful thing about Effects is the ability to define
+different handlers. %% @TODO: oh man...
+
+We present here as an example the "standard" \code{IO} handler. Once again, the
+handling of \code{Lock}, \code{Unlock}, \code{Read}, \code{Write} is
+straightforward:
+
+\begin{verbatim}
+instance Handler (ConcState IO) IO where
+    handle env (Write ind val prf) k = do
+        let newenv = envWrite env ind val prf
+        k newenv ()
+    handle env (Read ind prf) k = do
+        let val = envRead env ind prf
+        k env val
+    handle env (Lock ind prf_elem prf_unlocked) k = do
+        let newenv = envLock env ind prf_elem
+        k newenv ()
+    handle env (Unlock ind prf) k = do
+        let newenv = envUnlock env ind prf
+        k newenv ()
+\end{verbatim}
+
+Note that \code{env} and \code{newenv} here environments in the \code{ConcEnv}
+sense, NOT in the Effects sense, i.e. environments corresponding to the shared
+resources in the \code{ConcState}.
+
+\code{Fork} is perhaps a bit more cryptic and magical:
+
+\begin{verbatim}
+    handle env (Fork prf prog) k = do
+        let _ = fork (run [env] prog)
+        k env ()
+\end{verbatim}
+
+Let us dissect it:
+
+\begin{itemize}
+    \item \code{fork} is an \code{IO} primitive available in Idris which forks
+        a program of type \code{IO ()} into a new thread.
+    \item \code{run} is part of the Effects library, it is used to run an
+    effectful program and has the type:
+    \begin{verbatim}
+run : Applicative m => Env m xs -> (prog: EffM m xs xs' a) -> m a
+    \end{verbatim}
+    so the \code{[env]} \emph{is} now actually an Effects \code{Env}.
+\end{itemize}
+
+Furthermore, now it can be seen why we parametrised \code{ConcState} over
+a computational context \code{(m: Type -> Type)}: we want to ensure that we only
+fork \code{CONCSTATE} subprograms which will be run in the same computational
+context as the parent \code{CONCSTATE} program. [Note: I believe it might be
+possible to avoid this, but I did not explore this enough as it was not the
+main concern.]
+
+Moreover, observe that the only reason we need to run this in an \code{IO}
+monad is because we are using \code{fork}. If, e.g. we changed the handling of
+\code{Fork} to be, e.g. sequential:
+
+\begin{verbatim}
+    handle env (Fork prf prog) k = do
+        let _ = run [env] prog
+        k env ()
+\end{verbatim}
+
+we could have a generic instance which could be run in any computational
+context \code{m}.
+
+@TODO: show and example of a "basic action", such as \code{ffork}
 
 \subsection{The problems}
+
+\emph{@TODO: Figure out: if we didn't have other problems, would the
+restriction to a single computational context be an issue? Can effects switch
+computational contexts during execution?}
 
 @TODO: talk about non-composability and why it is currently a limitation of the
 effects library.
