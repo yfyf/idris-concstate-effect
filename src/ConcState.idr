@@ -63,6 +63,9 @@ using (rsin: Vect n ResState)
     envUnlock (Extend r rsin) (fS i) (ElemAtIsThere foo) =
         Extend r (envUnlock rsin i foo)
 
+mutual -- mutual due to Fork using CONCSTATE
+ using (rsin: Vect n ResState)
+
     data ConcState: (m: Type -> Type) -> Effect where
         -- Lock a shared variable.
         -- Must know that no lower priority items are locked, that is everything
@@ -88,12 +91,11 @@ using (rsin: Vect n ResState)
         -- We allow forking only when all resources are unlocked, which is
         -- guaranteed to be safe
         Fork: {m: Type -> Type} -> (AllUnlocked rsin) ->
-                (Eff m [MkEff (REnv rsin) (ConcState m)] ()) ->
+                (Eff m [CONCSTATE rsin m] ()) ->
                 ConcState m (REnv rsin) (REnv rsin) ()
 
-
-CONCSTATE: Vect n ResState -> (Type -> Type) -> EFFECT
-CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
+    CONCSTATE: Vect n ResState -> (Type -> Type) -> EFFECT
+    CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
 
 instance Handler (ConcState IO) IO where
     handle env (Write ind val prf) k = do
