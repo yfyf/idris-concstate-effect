@@ -38,8 +38,8 @@ frk_action = do
         return ())
     return ()
 
-Main.main: IO ()
-Main.main = do
+test: IO ()
+test = do
     h <- get_lock 1
     putStrLn "main has lock"
     frk_action
