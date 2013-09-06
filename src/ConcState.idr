@@ -17,13 +17,6 @@ data ElemAtIs: (i: Fin n) -> a -> Vect n a -> Type where
                                 ElemAtIs i x xs ->
                                 ElemAtIs (fS i) x (y::xs)
 
-data PrevUnlocked: (i: Fin n) -> (rsin: Vect n ResState) -> Type where
-   UnlockedHere: {x: ResState} -> {xs: Vect n ResState} ->
-                     PrevUnlocked fZ (x :: xs)
-   UnlockedThere: {i: Fin n} -> {xs: Vect n ResState} ->
-                                (PrevUnlocked i xs) ->
-                                (PrevUnlocked (fS i) ((RState Z t) :: xs))
-
 prevUnlocked: Fin n -> Vect n ResState -> Bool
 prevUnlocked fZ (x :: xs) = True
 prevUnlocked (fS k) (RState Z t :: xs) = prevUnlocked k xs
@@ -47,40 +40,63 @@ mutual -- mutual due to Fork using CONCSTATE
 
     data GenConcState: (m: Type -> Type) -> (interp: ResState -> Type) ->
                         Effect where
+        -- For debugging purposes
         Action: (action: IO ()) ->
                         GenConcState m interp
                             (GenREnv interp rsin)
                             (GenREnv interp rsin)
                             ()
+
         -- Lock a shared variable.
         -- Must know that no lower priority items are locked, that is everything
         -- before 'ind' in rsin must be unlocked.
         Lock: (ind: Fin n) ->
-              {auto p: prevUnlocked ind rsin = True} ->
+              (prevUnlocked ind rsin = True) ->
               GenConcState m interp (GenREnv interp rsin)
                         (GenREnv interp (bump_lock ind rsin))
                         ()
+
         -- Unlock a shared variable. Must know it is locked at least once.
-        Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-              GenConcState m interp (GenREnv interp rsin)
+        Unlock: (ind: Fin n) ->
+                (ElemAtIs ind (RState (S k) ty) rsin) ->
+                GenConcState m interp
+                        (GenREnv interp rsin)
                         (GenREnv interp (replaceAt ind (RState k ty) rsin))
                         ()
+
         -- Read from a locked variable.
-        Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-            GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ty
+        Read: (ind: Fin n) ->
+                (ElemAtIs ind (RState (S k) ty) rsin) ->
+                GenConcState m interp
+                    (GenREnv interp rsin)
+                    (GenREnv interp rsin)
+                    ty
+
         -- Write to a locked variable.
         Write: (ind: Fin n) ->
-                (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-                GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ()
+                (val:ty) ->
+                (ElemAtIs ind (RState (S k) ty) rsin) ->
+                GenConcState m interp
+                    (GenREnv interp rsin)
+                    (GenREnv interp rsin)
+                    ()
 
         -- We allow forking only when all resources are unlocked, which is
         -- guaranteed to be safe
-        Fork: {m: Type -> Type} -> (allUnlocked rsin = True) ->
+        Fork: {m: Type -> Type} ->
+                (allUnlocked rsin = True) ->
                 (Eff m [GEN_CONCSTATE interp rsin m] ()) ->
-                GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ()
+                GenConcState m interp
+                    (GenREnv interp rsin)
+                    (GenREnv interp rsin)
+                    ()
 
-    GEN_CONCSTATE: (ResState -> Type) -> Vect n ResState -> (Type -> Type) -> EFFECT
-    GEN_CONCSTATE interp rsin m = MkEff (GenREnv interp rsin) (GenConcState m interp)
+    GEN_CONCSTATE: (ResState -> Type) ->
+                        Vect n ResState ->
+                        (Type -> Type) ->
+                        EFFECT
+    GEN_CONCSTATE interp rsin m =
+        MkEff (GenREnv interp rsin) (GenConcState m interp)
 
 -------------- "standard" CONCSTATE effect --------------
 
@@ -133,7 +149,7 @@ instance Handler (ConcState IO) IO where
         let lockref = envRead env ind prf
         val <- read lockref
         k env (believe_me val)
-    handle env (Lock ind) k = do
+    handle env (Lock ind _) k = do
         ref <- get_lock (cast ind)
         let newenv = envLock ref env ind
         k newenv ()
@@ -160,7 +176,7 @@ lock: (ind: Fin n) ->
           {auto p: prevUnlocked ind rsin = True} ->
           EffM m [CONCSTATE rsin m]
                  [CONCSTATE (bump_lock ind rsin) m] ()
-lock i = (Lock i)
+lock i {p} = (Lock i p)
 
 unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
           EffM m [CONCSTATE rsin m]
@@ -174,10 +190,14 @@ efork prog {p} = (Fork p prog)
 action: {rsin: Vect n ResState} -> IO () -> Eff m [CONCSTATE rsin m] ()
 action io = (Action io)
 
------------------------------------------
+
+-- Some tests ------------------------------------------------------------
+
+UnlockedInt : ResState
+UnlockedInt = RState Z Int
 
 bump_first_val: {rsin: Vect k ResState} ->
-    Eff IO [(CONCSTATE ((RState l Int) :: rsin) IO)] Int
+    Eff IO [CONCSTATE (RState l Int :: rsin) IO] Int
 bump_first_val = do
     lock fZ
     val <- read fZ ElemAtIsHere
@@ -186,7 +206,9 @@ bump_first_val = do
     unlock fZ ElemAtIsHere
     return val'
 
-bump_single_val: Eff IO [CONCSTATE [(RState Z Int)] IO] Int
+bump_single_val: {rsin: Vect k ResState} ->
+    {auto p: allUnlocked rsin = True} ->
+    Eff IO [CONCSTATE (RState Z Int :: rsin) IO] Int
 bump_single_val = do
     lock fZ
     val <- read fZ ElemAtIsHere
@@ -200,9 +222,19 @@ bump_single_val = do
     unlock fZ ElemAtIsHere
     return rez
 
+
+zero_res : Resource UnlockedInt
+zero_res = resource Z (MkLockRef 0)
+
 %assert_total
 Main.main: IO ()
 Main.main = do
-    initialise_resources [0]
-    val <- run [(Extend (resource Z (MkLockRef 0)) Empty)] bump_single_val
+    initialise_resources [0, 1, 2]
+    val <- run [
+            Extend zero_res $
+            Extend zero_res $
+            Extend zero_res $
+            Empty
+        ] bump_single_val
+    putStr "The result is: "
     print val
