@@ -269,9 +269,9 @@ instance Handler (ConcState IO) IO where
         k newenv ()
 \end{verbatim}
 
-Note that \code{env} and \code{newenv} here environments in the \code{ConcEnv}
-sense, NOT in the Effects sense, i.e. environments corresponding to the shared
-resources in the \code{ConcState}.
+Note that \code{env} and \code{newenv} here are environments in the
+\code{ConcEnv} sense, NOT in the Effects sense, i.e. environments corresponding
+to the shared resources in the \code{ConcState}.
 
 \code{Fork} is perhaps a bit more cryptic and magical:
 
@@ -285,13 +285,13 @@ Let us dissect it:
 
 \begin{itemize}
     \item \code{fork} is an \code{IO} primitive available in Idris which forks
-        a program of type \code{IO ()} into a new thread.
+        a program of type \code{IO ()} to be executed in a new thread.
     \item \code{run} is part of the Effects library, it is used to run an
     effectful program and has the type:
     \begin{verbatim}
 run : Applicative m => Env m xs -> (prog: EffM m xs xs' a) -> m a
     \end{verbatim}
-    so the \code{[env]} \emph{is} now actually an Effects \code{Env}.
+    so the term \code{[env]} \emph{is} now actually an Effects \code{Env}.
 \end{itemize}
 
 Furthermore, now it can be seen why we parametrised \code{ConcState} over
@@ -311,16 +311,30 @@ monad is because we are using \code{fork}. If, e.g. we changed the handling of
         k env ()
 \end{verbatim}
 
-we could have a generic instance which could be run in any computational
-context \code{m}.
+we could have a generic instance which could be run in any \code{Applicative
+m}\footnote{The restriction that \code{m} must be an instance of
+\code{Applicative} can't be dropped, because of the type of \code{run}}.
 
-@TODO: show and example of a "basic action", such as \code{ffork}
+Finally, we can define the basic actions as standalone effectful programs
+(using the implicit lifting used in the Effects library). Here is how
+\code{write} and \code{efork}\footnote{the \code{e} prefix is used to avoid
+confusion with the IO primitive \code{fork}} are defined:
+
+\begin{verbatim}
+write: (ind: Fin n) -> (val: ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+            Eff m [(CONCSTATE rsin m)] ()
+write i val el_prf = (Write i val el_prf)
+
+efork: {rsin: Vect n ResState} -> (prf: AllUnlocked rsin) ->
+            Eff m [CONCSTATE rsin m] () -> Eff m [CONCSTATE rsin m] ()
+efork prf prog = (Fork prf prog)
+\end{verbatim}
+
+@TODO: mention that it would be possible to add some tactics here so that
+explicit proofs would not be needed.
 
 \subsection{The problems}
 
 \emph{@TODO: Figure out: if we didn't have other problems, would the
 restriction to a single computational context be an issue? Can effects switch
 computational contexts during execution?}
-
-@TODO: talk about non-composability and why it is currently a limitation of the
-effects library.
