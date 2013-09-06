@@ -5,6 +5,14 @@
 #include <sys/file.h>
 #include <errno.h>
 
+int debug(char* str) {
+#ifdef DEBUG
+    printf(str);
+    printf("\n");
+#endif
+    return 0;
+}
+
 int get_lock(int num) {
     int fd;
 
@@ -20,10 +28,12 @@ int get_lock(int num) {
         printf("Locking failed");
         exit(EXIT_FAILURE);
     }
+    debug("Got lock");
     return fd;
 }
 
 int release_lock(int fd) {
+    debug("Released lock");
     flock(fd, LOCK_UN);
     close(fd);
     return 0;
@@ -36,14 +46,17 @@ int empty_file(int fd) {
 }
 
 int write_locked(int fd, int val) {
+    debug("Writing...");
     empty_file(fd);
     char buf[100];
     sprintf(buf, "%d", val);
+    debug(buf);
     write(fd, buf, strlen(buf));
     return 0;
 }
 
 int read_locked(int fd) {
+    debug("Reading...");
     off_t size = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
     char *buff = malloc(size + 1);
