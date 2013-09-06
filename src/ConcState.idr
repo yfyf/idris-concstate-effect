@@ -3,6 +3,8 @@ module ConcState
 import Effects
 import ConcEnv
 import IO
+import Locks
+import System
 
 %default total
 
@@ -22,38 +24,90 @@ data PrevUnlocked: (i: Fin n) -> (rsin: Vect n ResState) -> Type where
                                 (PrevUnlocked i xs) ->
                                 (PrevUnlocked (fS i) ((RState Z t) :: xs))
 
-data AllUnlocked: (xs: Vect n ResState) -> Type where
-    AllUnlYes: AllUnlocked []
-    AllUnlAlmost: {xs:Vect n ResState} -> AllUnlocked xs ->
-        AllUnlocked ((RState Z t) :: xs)
+prevUnlocked: Fin n -> Vect n ResState -> Bool
+prevUnlocked fZ (x :: xs) = True
+prevUnlocked (fS k) (RState Z t :: xs) = prevUnlocked k xs
+prevUnlocked _ _ = False
 
-data Resource: ResState -> Type where
-     resource: (l: Nat) -> (r: ty) -> (Resource (RState l ty))
+allUnlocked: (xs: Vect n ResState) -> Bool
+allUnlocked [] = True
+allUnlocked ((RState Z t) :: xs) = allUnlocked xs
+allUnlocked _ = False
 
-REnv: (xs:Vect n ResState) -> Type
-REnv xs = ConcEnv ResState Resource xs
+
+bump_lock: (i: Fin n) -> Vect n ResState -> Vect n ResState
+bump_lock fZ (RState l t :: xs) = (RState (S l) t :: xs)
+bump_lock (fS k) (x :: xs) = x :: (bump_lock k xs)
+
+GenREnv: (ResState -> Type) -> (xs:Vect n ResState) -> Type
+GenREnv interp xs = ConcEnv ResState interp xs
+
+mutual -- mutual due to Fork using CONCSTATE
+ using (rsin: Vect n ResState)
+
+    data GenConcState: (m: Type -> Type) -> (interp: ResState -> Type) ->
+                        Effect where
+        Action: (action: IO ()) ->
+                        GenConcState m interp
+                            (GenREnv interp rsin)
+                            (GenREnv interp rsin)
+                            ()
+        -- Lock a shared variable.
+        -- Must know that no lower priority items are locked, that is everything
+        -- before 'ind' in rsin must be unlocked.
+        Lock: (ind: Fin n) ->
+              {auto p: prevUnlocked ind rsin = True} ->
+              GenConcState m interp (GenREnv interp rsin)
+                        (GenREnv interp (bump_lock ind rsin))
+                        ()
+        -- Unlock a shared variable. Must know it is locked at least once.
+        Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+              GenConcState m interp (GenREnv interp rsin)
+                        (GenREnv interp (replaceAt ind (RState k ty) rsin))
+                        ()
+        -- Read from a locked variable.
+        Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+            GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ty
+        -- Write to a locked variable.
+        Write: (ind: Fin n) ->
+                (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
+                GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ()
+
+        -- We allow forking only when all resources are unlocked, which is
+        -- guaranteed to be safe
+        Fork: {m: Type -> Type} -> (allUnlocked rsin = True) ->
+                (Eff m [GEN_CONCSTATE interp rsin m] ()) ->
+                GenConcState m interp (GenREnv interp rsin) (GenREnv interp rsin) ()
+
+    GEN_CONCSTATE: (ResState -> Type) -> Vect n ResState -> (Type -> Type) -> EFFECT
+    GEN_CONCSTATE interp rsin m = MkEff (GenREnv interp rsin) (GenConcState m interp)
+
+-------------- "standard" CONCSTATE effect --------------
 
 using (rsin: Vect n ResState)
+    data Resource: ResState -> Type where
+         resource: (l: Nat) -> LockRef -> (Resource (RState l Int))
 
-    envWrite: (REnv rsin) -> (i: Fin n) -> (val: ty) ->
-        (ElemAtIs i (RState (S k) ty) rsin) -> (REnv rsin)
-    envWrite (Extend (resource (S k) r) rsin) fZ val ElemAtIsHere =
-        Extend (resource (S k) val) rsin
-    envWrite (Extend r rsin) (fS i) val (ElemAtIsThere foo) =
-        Extend r (envWrite rsin i val foo)
+    REnv: (xs:Vect n ResState) -> Type
+    REnv xs = GenREnv Resource xs
+
+    ConcState: (m: Type -> Type) -> Effect
+    ConcState m = GenConcState m Resource
+
+    CONCSTATE: Vect n ResState -> (Type -> Type) -> EFFECT
+    CONCSTATE rsin m = GEN_CONCSTATE Resource rsin m
 
     envRead: (REnv rsin) -> (i: Fin n) ->
-        (ElemAtIs i (RState (S k) ty) rsin) -> ty
+        (ElemAtIs i (RState (S k) ty) rsin) -> LockRef
     envRead (Extend (resource _ r) _) fZ ElemAtIsHere = r
     envRead (Extend r rsin) (fS i) (ElemAtIsThere foo) = envRead rsin i foo
 
-    envLock: (REnv rsin) -> (i: Fin n) ->
-        (prf: ElemAtIs i (RState k ty) rsin) ->
-        (REnv (replaceAt i (RState (S k) ty) rsin))
-    envLock (Extend (resource l r) rsin) fZ ElemAtIsHere =
-        Extend (resource (S l) r) rsin
-    envLock (Extend r rsin) (fS i) (ElemAtIsThere foo) =
-        Extend r (envLock rsin i foo)
+    envLock: (ref: LockRef) -> (REnv rsin) -> (i: Fin n) ->
+        (REnv (bump_lock i rsin))
+    envLock newref (Extend (resource l _) rsin) fZ =
+        Extend (resource (S l) newref) rsin
+    envLock newref (Extend r rsin) (fS i) =
+        Extend r (envLock newref rsin i)
 
     envUnlock: (REnv rsin) -> (i: Fin n) ->
         (prf: ElemAtIs i (RState (S k) ty) rsin) ->
@@ -63,58 +117,36 @@ using (rsin: Vect n ResState)
     envUnlock (Extend r rsin) (fS i) (ElemAtIsThere foo) =
         Extend r (envUnlock rsin i foo)
 
-mutual -- mutual due to Fork using CONCSTATE
- using (rsin: Vect n ResState)
-
-    data ConcState: (m: Type -> Type) -> Effect where
-        -- Lock a shared variable.
-        -- Must know that no lower priority items are locked, that is everything
-        -- before 'ind' in rsin must be unlocked.
-        Lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
-              (PrevUnlocked ind rsin) ->
-              ConcState m (REnv rsin)
-                        (REnv (replaceAt ind (RState (S k) ty) rsin))
-                        ()
-        -- Unlock a shared variable. Must know it is locked at least once.
-        Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-              ConcState m (REnv rsin)
-                        (REnv (replaceAt ind (RState k ty) rsin))
-                        ()
-        -- Read from a locked variable.
-        Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-            ConcState m (REnv rsin) (REnv rsin) ty
-        -- Write to a locked variable.
-        Write: (ind: Fin n) ->
-                (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-                ConcState m (REnv rsin) (REnv rsin) ()
-
-        -- We allow forking only when all resources are unlocked, which is
-        -- guaranteed to be safe
-        Fork: {m: Type -> Type} -> (AllUnlocked rsin) ->
-                (Eff m [CONCSTATE rsin m] ()) ->
-                ConcState m (REnv rsin) (REnv rsin) ()
-
-    CONCSTATE: Vect n ResState -> (Type -> Type) -> EFFECT
-    CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
+instance Cast (Fin n) Int where
+  cast fZ    = 0
+  cast (fS k) = 1 + cast k
 
 instance Handler (ConcState IO) IO where
+    handle env (Action io) k = do
+        io
+        k env ()
     handle env (Write ind val prf) k = do
-        let newenv = envWrite env ind val prf
-        k newenv ()
+        let lockref = envRead env ind prf
+        write lockref (believe_me val)
+        k env ()
     handle env (Read ind prf) k = do
-        let val = envRead env ind prf
-        k env val
-    handle env (Lock ind prf_elem prf_unlocked) k = do
-        let newenv = envLock env ind prf_elem
+        let lockref = envRead env ind prf
+        val <- read lockref
+        k env (believe_me val)
+    handle env (Lock ind) k = do
+        ref <- get_lock (cast ind)
+        let newenv = envLock ref env ind
         k newenv ()
     handle env (Unlock ind prf) k = do
+        let lockref = envRead env ind prf
+        release_lock lockref
         let newenv = envUnlock env ind prf
         k newenv ()
-    handle env (Fork prf prog) k = do
-        -- works only with a `let`, no idea why
-        let _ = fork (run [env] prog)
+    handle env (Fork _ prog) k = do
+        _ <- fork (run [env] prog)
         k env ()
 
+----------------------------------------------------------
 
 write: (ind: Fin n) -> (val: ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
             Eff m [(CONCSTATE rsin m)] ()
@@ -124,53 +156,53 @@ read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
             Eff m [(CONCSTATE rsin m)] ty
 read i el_prf = (Read i el_prf)
 
-lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
-          (PrevUnlocked ind rsin) ->
-          EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState (S k) ty) rsin) m] ()
-lock i el_prf unl_prf = (Lock i el_prf unl_prf)
+lock: (ind: Fin n) ->
+          {auto p: prevUnlocked ind rsin = True} ->
+          EffM m [CONCSTATE rsin m]
+                 [CONCSTATE (bump_lock ind rsin) m] ()
+lock i = (Lock i)
 
 unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-          EffM m [CONCSTATE rsin m] [CONCSTATE (replaceAt ind (RState k ty) rsin) m] ()
+          EffM m [CONCSTATE rsin m]
+                 [CONCSTATE (replaceAt ind (RState k ty) rsin) m] ()
 unlock i el_prf = (Unlock i el_prf)
 
-ffork: {rsin: Vect n ResState} -> (prf: AllUnlocked rsin) ->
+efork: {rsin: Vect n ResState} -> {auto p: allUnlocked rsin = True} ->
             Eff m [CONCSTATE rsin m] () -> Eff m [CONCSTATE rsin m] ()
-ffork prf prog = (Fork prf prog)
+efork prog {p} = (Fork p prog)
+
+action: {rsin: Vect n ResState} -> IO () -> Eff m [CONCSTATE rsin m] ()
+action io = (Action io)
 
 -----------------------------------------
 
-%assert_total
 bump_first_val: {rsin: Vect k ResState} ->
-    Eff IO [(CONCSTATE ((RState l Nat) :: rsin) IO)] Nat
+    Eff IO [(CONCSTATE ((RState l Int) :: rsin) IO)] Int
 bump_first_val = do
-    lock fZ ElemAtIsHere UnlockedHere
+    lock fZ
     val <- read fZ ElemAtIsHere
-    --putStrLn ("val in thread:" ++ (show val))
     write fZ (val + 1) ElemAtIsHere
     val' <- read fZ ElemAtIsHere
-    --putStrLn ("val' in thread:" ++ (show val'))
     unlock fZ ElemAtIsHere
     return val'
 
-%assert_total
-bump_single_val: Eff IO [CONCSTATE [(RState Z Nat)] IO] Nat
+bump_single_val: Eff IO [CONCSTATE [(RState Z Int)] IO] Int
 bump_single_val = do
-    lock fZ ElemAtIsHere UnlockedHere
+    lock fZ
     val <- read fZ ElemAtIsHere
-    --putStrLn ("Bump single val initial " ++ (show val))
     write fZ (val + 1) ElemAtIsHere
     val' <- read fZ ElemAtIsHere
-    --putStrLn ("Bump single val final " ++ (show val'))
     unlock fZ ElemAtIsHere
-    ffork (AllUnlAlmost AllUnlYes) (do _ <- bump_first_val; return ())
-    lock fZ ElemAtIsHere UnlockedHere
+    efork (do _ <- bump_first_val; return ())
+    action (usleep 200)
+    lock fZ
     rez <- read fZ ElemAtIsHere
-    --putStrLn ("Result: " ++ (show rez))
     unlock fZ ElemAtIsHere
     return rez
 
 %assert_total
 Main.main: IO ()
 Main.main = do
-    val <- run [(Extend (resource Z Z) Empty)] bump_single_val
+    initialise_resources [0]
+    val <- run [(Extend (resource Z (MkLockRef 0)) Empty)] bump_single_val
     print val
