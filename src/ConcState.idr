@@ -137,6 +137,10 @@ instance Cast (Fin n) Int where
   cast fZ    = 0
   cast (fS k) = 1 + cast k
 
+instance Cast Nat Int where
+  cast Z    = 0
+  cast (S k) = 1 + cast k
+
 instance Handler (ConcState IO) IO where
     handle env (Action io) k = do
         io
@@ -196,27 +200,58 @@ action io = (Action io)
 UnlockedInt : ResState
 UnlockedInt = RState Z Int
 
-bump_first_val: {rsin: Vect k ResState} ->
-    Eff IO [CONCSTATE (RState l Int :: rsin) IO] Int
-bump_first_val = do
-    lock fZ
-    val <- read fZ ElemAtIsHere
-    write fZ (val + 1) ElemAtIsHere
-    val' <- read fZ ElemAtIsHere
-    unlock fZ ElemAtIsHere
-    return val'
+bump_elem: {rsin: Vect n ResState} -> {i: Fin n} ->
+    ElemAtIs i (RState k Int) rsin ->
+    ElemAtIs i (RState (S k) Int) (bump_lock i rsin)
+bump_elem ElemAtIsHere = ElemAtIsHere
+bump_elem (ElemAtIsThere ys) = ElemAtIsThere (bump_elem ys)
 
-bump_single_val: {rsin: Vect k ResState} ->
+lckPreserve_prf: {rsin: Vect n ResState} ->
+    ElemAtIs i (RState q Int) rsin ->
+    replaceAt i (RState q Int) (bump_lock i rsin) = rsin
+lckPreserve_prf ElemAtIsHere = refl
+lckPreserve_prf (ElemAtIsThere ys) = cong (lckPreserve_prf ys)
+
+
+concStateCng_prf: {rsin: Vect n ResState} ->
+            (replaceAt i (RState q Int) (bump_lock i rsin) = rsin) -> (
+            (CONCSTATE (replaceAt i (RState q Int) (bump_lock i rsin)) IO) =
+                (CONCSTATE rsin IO))
+concStateCng_prf p = ?concStateCng_prf
+
+ConcState.concStateCng_prf1 = proof {
+  intros;
+  rewrite p;
+  trivial ;
+}
+
+bump_nth_val: {rsin: Vect n ResState} -> (i: Fin n) ->
+    {auto p: prevUnlocked i rsin = True} ->
+    (prf: ElemAtIs i (RState q Int) rsin) ->
+    Eff IO [CONCSTATE rsin IO] ()
+bump_nth_val i prf = do
+    lock i
+    val <- read i (bump_elem prf)
+    write i (val + 1) (bump_elem prf)
+    rewrite (sym (concStateCng_prf (lckPreserve_prf prf))) in
+        unlock i (bump_elem prf)
+
+bump_first_val: {rsin: Vect k ResState} ->
+    Eff IO [CONCSTATE (RState l Int :: rsin) IO] ()
+bump_first_val = bump_nth_val fZ ElemAtIsHere
+
+increment_first_val: {rsin: Vect k ResState} ->
     {auto p: allUnlocked rsin = True} ->
-    Eff IO [CONCSTATE (RState Z Int :: rsin) IO] Int
-bump_single_val = do
+    (times: Nat) ->
+    Eff IO [CONCSTATE (UnlockedInt :: rsin) IO] Int
+increment_first_val times = do
     lock fZ
     val <- read fZ ElemAtIsHere
-    write fZ (val + 1) ElemAtIsHere
+    write fZ val ElemAtIsHere
     val' <- read fZ ElemAtIsHere
     unlock fZ ElemAtIsHere
-    efork (do _ <- bump_first_val; return ())
-    action (usleep 200)
+    _ <- mapE efork $ replicate times bump_first_val
+    action $ usleep $ cast $ 100 * times
     lock fZ
     rez <- read fZ ElemAtIsHere
     unlock fZ ElemAtIsHere
@@ -230,11 +265,6 @@ zero_res = resource Z (MkLockRef 0)
 Main.main: IO ()
 Main.main = do
     initialise_resources [0, 1, 2]
-    val <- run [
-            Extend zero_res $
-            Extend zero_res $
-            Extend zero_res $
-            Empty
-        ] bump_single_val
+    val <- run [Extend zero_res Empty] $ increment_first_val 1000
     putStr "The result is: "
     print val
