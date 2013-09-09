@@ -113,10 +113,10 @@ using (rsin: Vect n ResState)
     CONCSTATE: Vect n ResState -> (Type -> Type) -> EFFECT
     CONCSTATE rsin m = GEN_CONCSTATE Resource rsin m
 
-    envRead: (REnv rsin) -> (i: Fin n) ->
+    envLookup: (REnv rsin) -> (i: Fin n) ->
         (ElemAtIs i (RState (S k) ty) rsin) -> LockRef
-    envRead (Extend (resource _ r) _) fZ ElemAtIsHere = r
-    envRead (Extend r rsin) (fS i) (ElemAtIsThere foo) = envRead rsin i foo
+    envLookup (Extend (resource _ r) _) fZ ElemAtIsHere = r
+    envLookup (Extend r rsin) (fS i) (ElemAtIsThere foo) = envLookup rsin i foo
 
     envLock: (ref: LockRef) -> (REnv rsin) -> (i: Fin n) ->
         (REnv (bump_lock i rsin))
@@ -146,11 +146,11 @@ instance Handler (ConcState IO) IO where
         io
         k env ()
     handle env (Write ind val prf) k = do
-        let lockref = envRead env ind prf
+        let lockref = envLookup env ind prf
         write lockref (believe_me val)
         k env ()
     handle env (Read ind prf) k = do
-        let lockref = envRead env ind prf
+        let lockref = envLookup env ind prf
         val <- read lockref
         k env (believe_me val)
     handle env (Lock ind _) k = do
@@ -158,7 +158,7 @@ instance Handler (ConcState IO) IO where
         let newenv = envLock ref env ind
         k newenv ()
     handle env (Unlock ind prf) k = do
-        let lockref = envRead env ind prf
+        let lockref = envLookup env ind prf
         release_lock lockref
         let newenv = envUnlock env ind prf
         k newenv ()
@@ -211,7 +211,6 @@ lckPreserve_prf: {rsin: Vect n ResState} ->
     replaceAt i (RState q Int) (bump_lock i rsin) = rsin
 lckPreserve_prf ElemAtIsHere = refl
 lckPreserve_prf (ElemAtIsThere ys) = cong (lckPreserve_prf ys)
-
 
 concStateCng_prf: {rsin: Vect n ResState} ->
             (replaceAt i (RState q Int) (bump_lock i rsin) = rsin) -> (
