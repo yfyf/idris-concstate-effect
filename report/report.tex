@@ -16,12 +16,12 @@
 \setlength\parindent{0pt}
 
 
-\title{Using the Effects library in Idris to manage concurrent resources}
+\title{An Idris Effect for concurrent resource management}
 \author{Ignas Vyšniauskas \\ \url{ignas.vysniauskas@student.uva.nl} \\
-        ILLC, UvA \\
+        ILLC, University of Amsterdam \\
     \\ \textit{Supervisor:} Wouter Swierstra
     \\ \url{w.s.swierstra@uu.nl}
-    \\ UU
+    \\ Utrecht University
 }
 
 \begin{document}
@@ -29,9 +29,14 @@
 \maketitle
 
 \begin{abstract}
-    This is a report of my attempts to transform the eDSL for managing
-    concurrent resources in Idris described in \cite{cbconc-fi} by using the
-    Effects library described in \cite{effects-idr}.
+    This is a report of my attempt to transform the eDSL for managing
+    concurrent resources in Idris described in \cite{cbconc-fi} into an
+    algebraic effect using the Effects library described in \cite{effects-idr}.
+
+    The result is twofold: we succsefully obtain an effect which provides the
+    the same kind of functionality and safety guarantees as the original eDSL,
+    however we do not succeed in making the effect \emph{composable} with
+    other effects.
 \end{abstract}
 
 \input{chapters/intro}

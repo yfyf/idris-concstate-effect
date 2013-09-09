@@ -13,16 +13,16 @@ concurrent algorithms and then translated into an actual implementation.
 
 Naturally, both approaches are quite unsustainable and it is a shame that,
 despite having progressed research in the area quite a bit, most software
-systems are still handling concurrent resources "manually" (i.e. with e.g.
-minimal-to-none help from the compiler) in practice.
+systems are still handling concurrent resources "manually" in practice (e.g.
+without any hints from the compiler about deadlocks).
 
 Hence the initial aim of this project was to explore advances in programming
 language research which would help us solve these problems. This idea
 crystallised into an attempt to explore the power of Dependent Types, in
 particular, the way they are used in Idris and attempting to use ideas from
-previous work on concurrent resource handling~\cite{cbconc-fi} and combine them
-with a new approach~\cite{eff} to handling programs with side effects as
-implemented in the Effects~\cite{effects-idr} library of Idris.
+previous work on concurrent resource handling~\cite{cbconc-fi}, combining them
+with a new \emph{effectful}~\cite{eff} approach to handling programs with side
+effects as implemented in the Effects~\cite{effects-idr} library of Idris.
 
 \subsection{Dependent Types and type safety}
 
@@ -31,32 +31,35 @@ distinct. The main benefit of this approach is that type inference is much
 simpler and, in fact, decidable.
 
 However, this means that it is very hard or impossible to precisely
-describe some of the data structures and flows of your program. In a type
-system with dependent types, the distinction between values and types is
-blurred and hence in dependently typed programming languages types are
-first-class citizens~\cite[p.~3]{idris-tutorial} and can be manipulated as any
-other term.
+describe some of the data structures and flows (i.e. relations) of your
+program. In a type system with dependent types, the distinction between values
+and types is blurred and types are promoted to first-class citizens in
+dependently typed programming languages~\cite[p.~3]{idris-tutorial}, which
+means they can be manipulated as any other term.
 
-The bad side is that type checking becomes, in general, undecidable.
+The price one has to pay for this is that type checking can in general become
+undecidable (which in addition signals a significant increase in complexity).
 
 The good part of this is that you can describe your data with "arbitrary"
 precision. A typical example of a data structure possible with dependent types
-is a fixed-length list, i.e. a vector. Which could be expressed as:
+is a fixed-length list, i.e. a vector. Which could be expressed as
+a Haskell-style typeclass as follows:
 
 \begin{SaveVerbatim}{vect}
 
--- expressed as Haskell-style data-type: parametrised over a length and a type
+-- the Vect is parametrised over a length and a type
 data Vect : Nat -> Type -> Type where
-  -- empty vector constructor, Z stands for 0
-  Nil  : Vect Z a
-  -- the standard cons operator, where `S` is the natural number successor operator
-  (::) : a -> Vect n a -> Vect (S n) a
+    -- empty vector constructor, Z stands for 0
+    Nil  : Vect Z a
+    -- the standard cons operator, where `S` is
+    -- the natural number successor operator
+    (::) : a -> Vect n a -> Vect (S n) a
 
 \end{SaveVerbatim}
 \useverb{vect}
 
 which makes it possible to, e.g. describe the standard "list-type" functions
-such as \texttt{head} and appending very precisely:
+such as \code{head} and append (\code{++}) very precisely:
 
 \begin{SaveVerbatim}{headtail}
 
@@ -64,7 +67,7 @@ such as \texttt{head} and appending very precisely:
 head : Vect (S n) a -> a
 head (x::xs) = x
 
--- precisely describe the output vector length
+-- carry around the vector length when appending
 (++) : Vect m a -> Vect n a -> Vect (m + n) a
 (++) []      ys = ys
 (++) (x::xs) ys = x :: xs ++ ys
@@ -72,17 +75,13 @@ head (x::xs) = x
 \end{SaveVerbatim}
 \useverb{headtail}
 
-@TODO: improve/remove, this is super vague:
-
-In general, having Dependent Types allows parametrising types over any terms,
-which means one is able to create complicated data structures using the
-expressive type system.
-
 \subsection{Idris}
 
-Idris is a research language with Dependent Types influenced by Haskell, which
-tries to be a general purpose language aimed at systems programming (via easy
-interfacing with C, compilation to multiple backends (C, JavaScript, Java)).
+Idris is a research language with Dependent Types conceived by Edwin Brady at
+the University of St Andrews. Idris is influenced by Haskell and tries to be a
+general purpose language aimed at systems programming (via easy interfacing
+with C, compilation to multiple backends (C, JavaScript, Java) and various
+performance optimisations).
 
 Since my goal was to solve a practical problem of making it easier to work with
 resources in a concurrent setting, Idris, due to its aims, seemed as a perfect

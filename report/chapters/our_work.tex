@@ -2,36 +2,33 @@
 
 \subsection{Considerations}
 
-The main goal of my experiment was to implement an effect for
-concurrent resource management in order to make use of the Effects library, in
-particular, the comparability brought by it.
+The main goal of this experiment was to implement an effect for concurrent
+resource management in order to make use of the Effects library, in particular
+the composability brought by using algebraic effects in general.
 
 Ideally, one would probably want to have an effect similar to \code{STATE}
 for managing an arbitrary resource associated with some state and also
 thread-safety sprinkled on top. This would be easy to do if we only had
 \emph{one} resource to manage, however since we are dealing with a set of
-resources (i.e. like in the CbC paper), this is not possible, at least in the
-current Effects library, because individual effects are not "aware" of any
-other effects, i.e. it's impossible to reference another effect from within the
-definition of one. This would be needed in order to ensure that resources are
-managed without deadlocks, since for this need to introduce an ordering among
-resources, which is impossible if the effects can't reference one another.
+\emph{ordered} resources (i.e. like in the CbC paper), this is not possible, at
+least in the current Effects library, because effects live in isolation, i.e.
+it's impossible to reference other effects from within the definition of one.
 
 Hence we are forced to have a combined state (or an "environment") for managing
 all the resources, though this is not much of an issue and is essentially the
 same approach which is taken in the CbC paper.
 
 Due to exactly the same reasons, although we might want to have forking as an
-effect of it's own (which, for example, executes an effectful program in a
-separate thread), this is not possible if we want to provide the safety
+effect on its own (which e.g. executes an effectful program in some "parallel"
+computational context, allowing to write handlers which perform different
+interleavings and etc.), this is not possible if we want to provide the safety
 guarantees. (And in fact forking induces additional and more fundamental
 issues, as we will see latter).
-
 
 \subsection{The predicates}
 
 As a consequence of the considerations, we model the management of a collection
-of resources in almost exactly the same way as it was done in the CbC paper.
+of resources in a very similarly to to how it was done in the CbC paper.
 
 Our first ingredient in constructing the effect is the type for
 \emph{representing} the state of a resource, which will be used to in
@@ -39,7 +36,7 @@ describing the various safety conditions.
 
 \begin{SaveVerbatim}{resstate}
 
-data ResState = RState Nat  -- number of times it has been locked.
+data ResState = RState Nat  -- number of times a resource has been locked.
                        Type -- type of resource
 
 \end{SaveVerbatim}
@@ -48,8 +45,8 @@ data ResState = RState Nat  -- number of times it has been locked.
 We will represent a collection of resources that we want to manage safely as a
 vector, i.e. \code{Vect n ResState}.
 
-Next, come data predicates for ensuring, at the type-level, that certain
-conditions on the resources hold.
+Next come data predicates and functions which we shall use to ensure, at the
+type-level, that certain conditions on the resources hold.
 
 \code{ElemAtIs} is a generic predicate for ensuring that the element at
 position $i$ of a vector of length $n \geq i$ equals to some element \code{el}.
@@ -68,61 +65,63 @@ data ElemAtIs: (i: Fin n) -> (el: a) -> Vect n a -> Type where
 \end{SaveVerbatim}
 \useverb{elematis}
 
-
-The \code{PrevUnlocked} predicate states that all resources up to and including
-some index are unlocked (i.e. lock count is 0).
-
-[Note: \code{Z} is the zero for the type \code{Nat}.]
+The \code{prevUnlocked} function checks whether all resources up to and
+including some index are unlocked (i.e. lock count is 0).
 
 \begin{SaveVerbatim}{prevunlocked}
 
-data PrevUnlocked: (i: Fin n) -> (rsin: Vect n ResState) -> Type where
-   UnlockedHere: {x: ResState} -> {xs: Vect n ResState} ->
-                     PrevUnlocked fZ (x :: xs)
-   UnlockedThere: {i: Fin n} -> {xs: Vect n ResState} ->
-                                (PrevUnlocked i xs) ->
-                                (PrevUnlocked (fS i) ((RState Z t) :: xs))
+prevUnlocked: Fin n -> Vect n ResState -> Bool
+prevUnlocked fZ (x :: xs) = True
+prevUnlocked (fS k) (RState Z t :: xs) = prevUnlocked k xs
+prevUnlocked _ _ = False
+
 \end{SaveVerbatim}
 \useverb{prevunlocked}
 
-Finally, the \code{AllUnlocked} predicate specifies that all the resources in a
+Finally, the \code{allUnlocked} function checks that all the resources in a
 collection are unlocked.
-
 
 \begin{SaveVerbatim}{allunlocked}
 
-data AllUnlocked : (xs: Vect n ResState) -> Type where
-    AllUnlYes : AllUnlocked []
-    AllUnlAlmost : {xs:Vect n ResState} -> AllUnlocked xs ->
-        AllUnlocked ((RState Z t) :: xs)
+allUnlocked: (xs: Vect n ResState) -> Bool
+allUnlocked [] = True
+allUnlocked ((RState Z t) :: xs) = allUnlocked xs
+allUnlocked _ = False
 
 \end{SaveVerbatim}
 \useverb{allunlocked}
 
-\subsection{The environment}
+\subsection{Interpreters and the environment}
 
-In order to actually hold some data associated with the resource collection, we
-introduce a \code{Resource} constructor and a notion of an \emph{environment}.
+In order to associate a \code{ResState} resource representation with some
+concrete values, we shall use data type constructor of the form
+\code{ResState -> Type}. We shall call constructors of such type
+\emph{interpretations} of resources (i.e. \code{ResState}s).
 
-Since we didn't implement actual interfacing with some, say, OS level locking
-primitives, we choose the simplest possible \code{Resource} constructor which
-is good enough for modelling purposes, i.e. we simply pass the lock-count and
-resource values.
+For the sake of simplicity, we used an interpreter which only
+supports \code{Int} resources:
 
 \begin{SaveVerbatim}{resource}
 
-data Resource : ResState -> Type where
-     resource : (l:Nat) -> (r:ty) -> (Resource (RState l ty))
+data Resource: ResState -> Type where
+     resource: (lock_count: Nat) -> LockRef ->
+                    (Resource (RState lock_count Int))
 
 \end{SaveVerbatim}
 \useverb{resource}
 
-Furthermore, we introduce a resource environment (\code{REnv}) for a collection
-of resources (i.e. \code{Vect n ResState}):
+It is parametrised over a lock reference \code{LockRef}, which will be used to
+access the locks and resource data via a small library we implemented for
+demonstration purposes. It is also parametrised over an explicit lock count,
+since our library doesn't actually support nested locks, so we only keep the
+lock count for simulation purposes.
+
+Furthermore, we combine the interprations of the resource states (i.e.
+\code{Vect n ResState}) into a resource \emph{environment} \code{REnv}:
 
 \begin{SaveVerbatim}{renv}
 
-REnv : (xs:Vect n ResState) -> Type
+REnv: (xs:Vect n ResState) -> Type
 REnv xs = ConcEnv ResState Resource xs
 
 \end{SaveVerbatim}
@@ -142,38 +141,40 @@ data ConcEnv: (t: Type) -> (iR: t -> Type) -> (xs: Vect n t) -> Type where
 \end{SaveVerbatim}
 \useverb{renv}
 
-where \code{iR} is an interpretation function, which assigns an actual resource
-(in our case, of type \code{Resource}) to the representation of it (in our
-case, of type \code{ResState}). Hence our \code{resource} constructor can be
-seen as an interpretation of the abstract resource state.
+where \code{iR} is a generic interpretation function.
 
-Finally, we have functions to modify the environment: \code{envWrite},
-\code{envRead}, \code{envLock} an \code{envUnlock}.
+Finally, we have functions to access and modify the environment:
+\code{envLookup}, \code{envLock} an \code{envUnlock}.
 
-As an example, here is the definition of \code{envWrite}. Note that we are
-providing a proof that the element to which we are writing is locked and the
-input value type matches the resource value type.
+As an example, here is the definition of \code{envUnlock}. Note that we are
+providing a proof that the element to which we are writing is locked:
 
-\begin{SaveVerbatim}{envwrite}
+\begin{SaveVerbatim}{envLookup}
 
-    envWrite : {rsin: Vect n ResState} -> (REnv rsin) ->
-                    (i: Fin n) -> (val: ty) ->
-                    (ElemAtIs i (RState (S k) ty) rsin) ->
-                    (REnv rsin)
-    envWrite (Extend (resource (S k) r) rsin) fZ val ElemAtIsHere =
-        Extend (resource (S k) val) rsin
-    envWrite (Extend r rsin) (fS i) val (ElemAtIsThere foo) =
-        Extend r (envWrite rsin i val foo)
+    envLookup: (REnv rsin) -> (i: Fin n) ->
+        (proof: ElemAtIs i (RState (S k) ty) rsin) -> LockRef
+    envLookup (Extend (resource _ r) _) fZ ElemAtIsHere =
+        r
+    envLookup (Extend r rsin) (fS i) (ElemAtIsThere foo) =
+        envLookup rsin i foo
 
 \end{SaveVerbatim}
-\useverb{envwrite}
+\useverb{envLookup}
+
+Note: although the \code{REnv} and, e.g. \code{envLookup} are implemented in a
+way which directly depends on our \code{Resource} interpretation and hence
+make it seem impossible to provide other interpretations, this can be easily
+abstracted using e.g. a typeclass for such interpretations, but we avoided this
+approach for simplicity and flexibility (i.e. this induces more tedious work
+for writing alternative versions of the \code{env*} functions, but allows one
+to have any kind of interpreter).
 
 \subsection{The effect}
 
 We finally arrive at the actual definition of the \code{ConcState} effect.
 
 For reasons explained later, we parametrise \code{ConcState} over a
-computational context \code{m: Type -> Type}:
+computational context \code{(m: Type -> Type)}:
 
 \begin{verbatim}
     data ConcState: (m: Type -> Type) -> Effect where
@@ -259,7 +260,7 @@ instance Handler (ConcState IO) IO where
         let newenv = envWrite env ind val prf
         k newenv ()
     handle env (Read ind prf) k = do
-        let val = envRead env ind prf
+        let val = envLookup env ind prf
         k env val
     handle env (Lock ind prf_elem prf_unlocked) k = do
         let newenv = envLock env ind prf_elem
