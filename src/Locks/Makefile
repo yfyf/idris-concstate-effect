@@ -1,9 +1,7 @@
-.PHONY: Locks
+all: Locks.ibc
 
-all: locker Locks
+Locks.ibc: Locks.idr locker
+	idris --check $<
 
 locker: locker.c
-	gcc -Wall -c -o locker $<
-
-Locks: Locks.idr
-	idris --check $<
+	gcc -Wall -c -o $@ $<

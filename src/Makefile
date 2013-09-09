@@ -1,13 +1,13 @@
-.PHONY: ConcState Locks
+.PHONY: Locks
 
-all: Locks ConcEnv ConcState
+all: Locks ConcState
 
 Locks:
 	$(MAKE) -C $@
 
-ConcEnv: ConcEnv.idr
+ConcEnv.ibc: ConcEnv.idr
 	idris --check $<
 
-ConcState: ConcState.idr
+ConcState: ConcState.idr ConcEnv.ibc
 	idris -o $@ $< -i Locks/ -p effects
 

@@ -2,7 +2,7 @@ module Locks
 
 import System
 
-%link C "Locks/locker"
+%link C "locker"
 
 data LockRef = MkLockRef Int
 
