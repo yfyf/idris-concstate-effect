@@ -40,23 +40,16 @@ mutual -- mutual due to Fork using CONCSTATE
 
     data GenConcState: (m: Type -> Type) -> (interp: ResState -> Type) ->
                         Effect where
-        -- For debugging purposes
-        Action: (action: IO ()) ->
-                        GenConcState m interp
-                            (GenREnv interp rsin)
-                            (GenREnv interp rsin)
-                            ()
-
-        -- Lock a shared variable.
-        -- Must know that no lower priority items are locked, that is everything
-        -- before 'ind' in rsin must be unlocked.
+        -- Lock a resource.
+        -- Requires a proof that all resources ordered before it are unlocked.
         Lock: (ind: Fin n) ->
               (prevUnlocked ind rsin = True) ->
               GenConcState m interp (GenREnv interp rsin)
                         (GenREnv interp (bump_lock ind rsin))
                         ()
 
-        -- Unlock a shared variable. Must know it is locked at least once.
+        -- Unlock a locked resource.
+        -- Requires a proof it was locked.
         Unlock: (ind: Fin n) ->
                 (ElemAtIs ind (RState (S k) ty) rsin) ->
                 GenConcState m interp
@@ -64,7 +57,8 @@ mutual -- mutual due to Fork using CONCSTATE
                         (GenREnv interp (replaceAt ind (RState k ty) rsin))
                         ()
 
-        -- Read from a locked variable.
+        -- Read from locked a resource.
+        -- Requires a proof it was locked.
         Read: (ind: Fin n) ->
                 (ElemAtIs ind (RState (S k) ty) rsin) ->
                 GenConcState m interp
@@ -72,7 +66,9 @@ mutual -- mutual due to Fork using CONCSTATE
                     (GenREnv interp rsin)
                     ty
 
-        -- Write to a locked variable.
+        -- Write to a locked resource.
+        -- Requires a proof it was locked and
+        -- matches the type of the value being written.
         Write: (ind: Fin n) ->
                 (val:ty) ->
                 (ElemAtIs ind (RState (S k) ty) rsin) ->
@@ -81,8 +77,8 @@ mutual -- mutual due to Fork using CONCSTATE
                     (GenREnv interp rsin)
                     ()
 
-        -- We allow forking only when all resources are unlocked, which is
-        -- guaranteed to be safe
+        -- Fork a GEN_CONCSTATE program.
+        -- Requires a proof that all resources are unlocked.
         Fork: {m: Type -> Type} ->
                 (allUnlocked rsin = True) ->
                 (Eff m [GEN_CONCSTATE interp rsin m] ()) ->
@@ -142,9 +138,6 @@ instance Cast Nat Int where
   cast (S k) = 1 + cast k
 
 instance Handler (ConcState IO) IO where
-    handle env (Action io) k = do
-        io
-        k env ()
     handle env (Write ind val prf) k = do
         let lockref = envLookup env ind prf
         write lockref (believe_me val)
@@ -191,10 +184,6 @@ efork: {rsin: Vect n ResState} -> {auto p: allUnlocked rsin = True} ->
             Eff m [CONCSTATE rsin m] () -> Eff m [CONCSTATE rsin m] ()
 efork prog {p} = (Fork p prog)
 
-action: {rsin: Vect n ResState} -> IO () -> Eff m [CONCSTATE rsin m] ()
-action io = (Action io)
-
-
 -- Some tests ------------------------------------------------------------
 
 UnlockedInt : ResState
@@ -221,7 +210,7 @@ concStateCng_prf p = ?concStateCng_prf
 ConcState.concStateCng_prf1 = proof {
   intros;
   rewrite p;
-  trivial ;
+  trivial;
 }
 
 bump_nth_val: {rsin: Vect n ResState} -> (i: Fin n) ->
@@ -237,33 +226,34 @@ bump_nth_val i prf = do
 
 bump_first_val: {rsin: Vect k ResState} ->
     Eff IO [CONCSTATE (RState l Int :: rsin) IO] ()
-bump_first_val = bump_nth_val fZ ElemAtIsHere
+bump_first_val = bump_nth_val 0 ElemAtIsHere
+
+%assert_total
+wait_until_equals: {rsin: Vect k ResState} ->
+                   Int ->
+                   Eff IO [CONCSTATE (UnlockedInt :: rsin) IO] Int
+wait_until_equals val = do
+    lock fZ
+    res <- read fZ ElemAtIsHere
+    unlock fZ ElemAtIsHere
+    if val == res
+        then return val
+        else wait_until_equals val
+
 
 increment_first_val: {rsin: Vect k ResState} ->
     {auto p: allUnlocked rsin = True} ->
     (times: Nat) ->
     Eff IO [CONCSTATE (UnlockedInt :: rsin) IO] Int
 increment_first_val times = do
-    lock fZ
-    val <- read fZ ElemAtIsHere
-    write fZ val ElemAtIsHere
-    val' <- read fZ ElemAtIsHere
-    unlock fZ ElemAtIsHere
     _ <- mapE efork $ replicate times bump_first_val
-    action $ usleep $ cast $ 100 * times
-    lock fZ
-    rez <- read fZ ElemAtIsHere
-    unlock fZ ElemAtIsHere
-    return rez
-
-
-zero_res : Resource UnlockedInt
-zero_res = resource Z (MkLockRef 0)
+    wait_until_equals (cast times)
 
 %assert_total
 Main.main: IO ()
 Main.main = do
-    initialise_resources [0, 1, 2]
-    val <- run [Extend zero_res Empty] $ increment_first_val 1000
+    [lockref] <- init_locks [0]
+    let res0 = resource 0 lockref
+    val <- run [Extend res0 Empty] $ increment_first_val 1000
     putStr "The result is: "
     print val
