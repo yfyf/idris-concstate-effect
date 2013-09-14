@@ -1,4 +1,16 @@
-\section{Introduction, motivation and aims}
+\section{Introduction}
+
+\subsection{Contributions}
+
+In this paper we describe our experiment in implementing an algebraic effect
+for safe concurrent resource management, which we call \code{ConcState}.
+
+The effect is implemented using the Effects library in Idris and is modelled
+after the \code{LockLang} eDSL~\cite{cbconc-fi} by Edwin Brady and Kevin
+Hammond.
+
+The full code is available at
+\url{https://github.com/yfyf/idris-concstate-effect}.
 
 \subsection{Motivation}
 
@@ -7,8 +19,8 @@ Rephrasing my supervisor: if sequential programs have a linear state space of
 $O(n)$, then concurrent programs have an exponential state space of $O(2^n)$,
 which is perhaps the core issue.
 
-Historically, either (unsafe) ad-hoc approaches have (and mostly still are)
-been used or formal models were created for proving the correctness of
+Historically, either (unsafe) ad-hoc approaches have been (and mostly still
+are) used or formal models were created for proving the correctness of
 concurrent algorithms and then translated into an actual implementation.
 
 Naturally, both approaches are quite unsustainable and it is a shame that,
@@ -45,7 +57,7 @@ precision. A typical example of a data structure possible with dependent types
 is a fixed-length list, i.e. a vector. Which could be expressed as
 a Haskell-style typeclass as follows:
 
-\begin{SaveVerbatim}{vect}
+\begin{BVerbatim}
 
 -- the Vect is parametrised over a length and a type
 data Vect : Nat -> Type -> Type where
@@ -55,13 +67,12 @@ data Vect : Nat -> Type -> Type where
     -- the natural number successor operator
     (::) : a -> Vect n a -> Vect (S n) a
 
-\end{SaveVerbatim}
-\useverb{vect}
+\end{BVerbatim}
 
 which makes it possible to, e.g. describe the standard "list-type" functions
 such as \code{head} and append (\code{++}) very precisely:
 
-\begin{SaveVerbatim}{headtail}
+\begin{BVerbatim}
 
 -- ensure the vector is non-empty by matching the length as (S n)
 head : Vect (S n) a -> a
@@ -72,8 +83,7 @@ head (x::xs) = x
 (++) []      ys = ys
 (++) (x::xs) ys = x :: xs ++ ys
 
-\end{SaveVerbatim}
-\useverb{headtail}
+\end{BVerbatim}
 
 \subsection{Idris}
 

@@ -3,17 +3,19 @@
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage{hyperref}
+\usepackage{listings}
+\usepackage[parfill]{parskip}
+
+\RecustomVerbatimEnvironment{BVerbatim}{BVerbatim}{%
+    fontsize=\small}
 
 \input{macros/conf.ltx}
 \input{macros/macros.ltx}
-\input{macros/library.ltx}
 
 \newcommand{\Idris}{\textsc{Idris}}
 \newcommand{\version}{0.9.9}
 \newcommand{\commit}{abcd}
 \newcommand{\code}{\texttt}
-
-\setlength\parindent{0pt}
 
 
 \title{An Idris Effect for concurrent resource management}
@@ -42,8 +44,8 @@
 \input{chapters/intro}
 \input{chapters/previous_work}
 \input{chapters/our_work}
+\input{chapters/issues}
 \input{chapters/conclusions}
-\input{chapters/source_code}
 
 \bibliographystyle{alpha}
 \bibliography{literature.bib}

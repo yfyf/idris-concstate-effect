@@ -34,13 +34,13 @@ Our first ingredient in constructing the effect is the type for
 \emph{representing} the state of a resource, which will be used to in
 describing the various safety conditions.
 
-\begin{SaveVerbatim}{resstate}
+\begin{BVerbatim}
 
-data ResState = RState Nat  -- number of times a resource has been locked.
-                       Type -- type of resource
+data ResState = RState
+    Nat  -- number of times a resource has been locked.
+    Type -- type of resource
 
-\end{SaveVerbatim}
-\useverb{resstate}
+\end{BVerbatim}
 
 We will represent a collection of resources that we want to manage safely as a
 vector, i.e. \code{Vect n ResState}.
@@ -54,7 +54,7 @@ position $i$ of a vector of length $n \geq i$ equals to some element \code{el}.
 [Note: Here \code{Fin n} is a type for natural numbers up to $n$, with constructors
 \code{fZ} (for $0$) and \code{fS} (for successor).]
 
-\begin{SaveVerbatim}{elematis}
+\begin{BVerbatim}
 
 data ElemAtIs: (i: Fin n) -> (el: a) -> Vect n a -> Type where
   ElemAtIsHere:  {x: a} -> {xs : Vect n a} -> ElemAtIs fZ x (x::xs)
@@ -62,34 +62,31 @@ data ElemAtIs: (i: Fin n) -> (el: a) -> Vect n a -> Type where
                                 ElemAtIs i x xs ->
                                 ElemAtIs (fS i) x (y::xs)
 
-\end{SaveVerbatim}
-\useverb{elematis}
+\end{BVerbatim}
 
 The \code{prevUnlocked} function checks whether all resources up to and
 including some index are unlocked (i.e. lock count is 0).
 
-\begin{SaveVerbatim}{prevunlocked}
+\begin{BVerbatim}
 
 prevUnlocked: Fin n -> Vect n ResState -> Bool
 prevUnlocked fZ (x :: xs) = True
 prevUnlocked (fS k) (RState Z t :: xs) = prevUnlocked k xs
 prevUnlocked _ _ = False
 
-\end{SaveVerbatim}
-\useverb{prevunlocked}
+\end{BVerbatim}
 
 Finally, the \code{allUnlocked} function checks that all the resources in a
 collection are unlocked.
 
-\begin{SaveVerbatim}{allunlocked}
+\begin{BVerbatim}
 
 allUnlocked: (xs: Vect n ResState) -> Bool
 allUnlocked [] = True
 allUnlocked ((RState Z t) :: xs) = allUnlocked xs
 allUnlocked _ = False
 
-\end{SaveVerbatim}
-\useverb{allunlocked}
+\end{BVerbatim}
 
 \subsection{Interpreters and the environment}
 
@@ -101,14 +98,13 @@ concrete values, we shall use data type constructor of the form
 For the sake of simplicity, we used an interpreter which only
 supports \code{Int} resources:
 
-\begin{SaveVerbatim}{resource}
+\begin{BVerbatim}
 
 data Resource: ResState -> Type where
      resource: (lock_count: Nat) -> LockRef ->
                     (Resource (RState lock_count Int))
 
-\end{SaveVerbatim}
-\useverb{resource}
+\end{BVerbatim}
 
 It is parametrised over a lock reference \code{LockRef}, which will be used to
 access the locks and resource data via a small library we implemented for
@@ -119,27 +115,27 @@ lock count for simulation purposes.
 Furthermore, we combine the interprations of the resource states (i.e.
 \code{Vect n ResState}) into a resource \emph{environment} \code{REnv}:
 
-\begin{SaveVerbatim}{renv}
+\begin{BVerbatim}
 
 REnv: (xs:Vect n ResState) -> Type
 REnv xs = ConcEnv ResState Resource xs
 
-\end{SaveVerbatim}
-\useverb{renv}
+\end{BVerbatim}
 
 where \code{ConcEnv} is a generic environment constructor, defined as:
 
 [Note: we use the name \code{ConcEnv} instead of just \code{Env} to avoid
 confusion with environments associated with effects in the Effects library.]
 
-\begin{SaveVerbatim}{renv}
-data ConcEnv: (t: Type) -> (iR: t -> Type) -> (xs: Vect n t) -> Type where
+\begin{BVerbatim}
+data ConcEnv: (t: Type) -> (iR: t -> Type) ->
+                           (xs: Vect n t) ->
+                           Type where
    Empty:  {iR: t -> Type} -> ConcEnv t iR []
    Extend: {r: t} -> {iR: t -> Type} -> {xs: Vect n t} ->
                      (res: (iR r)) -> ConcEnv t iR xs ->
                      ConcEnv t iR (r::xs)
-\end{SaveVerbatim}
-\useverb{renv}
+\end{BVerbatim}
 
 where \code{iR} is a generic interpretation function.
 
@@ -149,7 +145,7 @@ Finally, we have functions to access and modify the environment:
 As an example, here is the definition of \code{envUnlock}. Note that we are
 providing a proof that the element to which we are writing is locked:
 
-\begin{SaveVerbatim}{envLookup}
+\begin{BVerbatim}
 
     envLookup: (REnv rsin) -> (i: Fin n) ->
         (proof: ElemAtIs i (RState (S k) ty) rsin) -> LockRef
@@ -158,27 +154,33 @@ providing a proof that the element to which we are writing is locked:
     envLookup (Extend r rsin) (fS i) (ElemAtIsThere foo) =
         envLookup rsin i foo
 
-\end{SaveVerbatim}
-\useverb{envLookup}
+\end{BVerbatim}
 
 Note: although the \code{REnv} and, e.g. \code{envLookup} are implemented in a
 way which directly depends on our \code{Resource} interpretation and hence
 make it seem impossible to provide other interpretations, this can be easily
 abstracted using e.g. a typeclass for such interpretations, but we avoided this
-approach for simplicity and flexibility (i.e. this induces more tedious work
-for writing alternative versions of the \code{env*} functions, but allows one
-to have any kind of interpreter).
+approach for simplicity and flexibility\footnote{In particular, this induces more
+tedious work for writing alternative versions of the \code{env*} functions, but
+allows one to have any kind of interpreter functions.}.
 
 \subsection{The effect}
 
-We finally arrive at the actual definition of the \code{ConcState} effect.
+We now have all of the ingredients needed to construct the
+\code{ConcState} effect.
 
 For reasons explained later, we parametrise \code{ConcState} over a
 computational context \code{(m: Type -> Type)}:
 
-\begin{verbatim}
+\begin{BVerbatim}
     data ConcState: (m: Type -> Type) -> Effect where
-\end{verbatim}
+\end{BVerbatim}
+
+[Note: in the code we have actually defined the effect in terms of a more
+general \code{GenConcState} which is also parametrised over a \code{ResState}
+interpretation. Hence \code{ConcState} is just an instance of
+\code{GenConcState} which is using the \code{Resource} interpreter and we use
+it for ease of presentation.]
 
 The effect will have 5 actions: \code{Lock}, \code{Unlock}, \code{Read},
 \code{Write} and \code{Fork}.
@@ -187,100 +189,142 @@ The first 4 definitions are rather straightforward and there is little to
 comment on: for each action we ask for a proof of necessary conditions to be
 provided explicitly and ensure that the resource state is updated accordingly.
 
-[Note: in all of the remaining code, the variable \code{rsin} is of type
-\code{Vect n ResState} (declared with the \code{using} notation of Idris).]
+[Note: for less verbosity, in all of the remaining code, assume there is an
+implicit argument \code{rsin} of type \code{Vect n ResState} where needed.]
 
-\begin{verbatim}
--- Lock a shared variable.
--- Must know that no lower priority items are locked, that is everything
--- before 'ind' in rsin must be unlocked.
-Lock: (ind: Fin n) -> (ElemAtIs ind (RState k ty) rsin) ->
-      (PrevUnlocked ind rsin) ->
+\begin{BVerbatim}
+-- Lock a resource.
+-- Requires a proof that all resources
+-- ordered before it are unlocked.
+Lock: (ind: Fin n) ->
+      (prf: prevUnlocked ind rsin = True) ->
       ConcState m (REnv rsin)
-                (REnv (replaceAt ind (RState (S k) ty) rsin))
+                (REnv (bump_lock ind rsin))
                 ()
--- Unlock a shared variable. Must know it is locked at least once.
-Unlock: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-      ConcState m (REnv rsin)
+\end{BVerbatim}
+
+\begin{BVerbatim}
+-- Unlock a locked resource.
+-- Requires a proof it was locked.
+Unlock: (ind: Fin n) ->
+        (prf: ElemAtIs ind (RState (S k) ty) rsin) ->
+        ConcState m
+                (REnv rsin)
                 (REnv (replaceAt ind (RState k ty) rsin))
                 ()
--- Read from a locked variable.
-Read: (ind: Fin n) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-    ConcState m (REnv rsin) (REnv rsin) ty
--- Write to a locked variable.
+\end{BVerbatim}
+
+\begin{BVerbatim}
+-- Read from locked a resource.
+-- Requires a proof it was locked.
+Read: (ind: Fin n) ->
+        (prf: ElemAtIs ind (RState (S k) ty) rsin) ->
+        ConcState m
+            (REnv rsin)
+            (REnv rsin)
+            ty
+\end{BVerbatim}
+
+\begin{BVerbatim}
+-- Write to a locked resource.
+-- Requires a proof it was locked and
+-- matches the type of the value being written.
 Write: (ind: Fin n) ->
-        (val:ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-        ConcState m (REnv rsin) (REnv rsin) ()
-\end{verbatim}
+        (val: ty) ->
+        (prf: ElemAtIs ind (RState (S k) ty) rsin) ->
+        ConcState m
+            (REnv rsin)
+            (REnv rsin)
+            ()
 
-However, figuring out the right type for \code{Fork} is more challenging and
+\end{BVerbatim}
+
+Figuring out the right type for \code{Fork} is a bit more challenging and
 poses several questions. Since we are working with a functional programming
-language, we will want to pass a function to be executed in the new thread.
-However, in this setting we need to ensure that once the thread execution
-finishes, the resource states are the same as they were initially.
+language, we probably want pass a function which is to be executed in a new
+thread.
 
-[@TODO: explain that \code{CONCSTATE} and \code{ConcState} are defined with
-mutual recursion, by using:
-\begin{verbatim}
+However, we need to ensure that the function preserves the state of
+the resources. Hence, instead of an arbitrary function, we want pass an
+effectful program, which leaves the state of resources unchanged.
+
+Furthermore, safely handling values "returned" from a thread is problematic, so
+we assume the function output is a unit.
+
+A naive choice for the type of a program which fits our description is
+\code{Eff m [CONCSTATE rsin m] ()}, where \code{CONCSTATE} is the
+\emph{concrete} effect for {\code{ConcState}\footnote{In
+particular, this implies that \code{ConcState} and \code{CONCSTATE} will be
+defined mutually recursivly to each other.}}, i.e.~the
+instance of the effect for a specific collection of resources\footnote{See the
+Effects paper~\cite[p.~2]{effects-idr} for a more detailed explanation},
+defined as:
+
+\begin{BVerbatim}
 CONCSTATE : Vect n ResState -> (Type -> Type) -> EFFECT
 CONCSTATE rsin m = MkEff (REnv rsin) (ConcState m)
-\end{verbatim}
-]
+\end{BVerbatim}
 
-Hence, instead of an arbitrary function, we want to pass an effectful program,
-which leaves the state of resources unchanged. Furthermore, it would be
-problematic to safely and usefully handle a return value of a thread, so we
-assume the functions output is a unit.
+We will use the type \code{Eff m [CONCSTATE rsin m] ()} for now and discuss
+problems raised by it later.
 
-A naive type for such a program is: \code{Eff m [CONCSTATE rsin m] ()}. We will
-use it for now and discuss problems raised by enforcing this type of programs
-only later.
+With all the considerations in mind, we can now complete the definition of
+\code{ConcState} by defining \code{Fork} as follows:
 
-We can then define \code{Fork} as follows:
-\begin{verbatim}
--- We allow forking only when all resources are unlocked, which is
--- guaranteed to be safe
-Fork : {m: Type -> Type} -> (proof: AllUnlocked rsin) ->
+\begin{BVerbatim}
+
+-- Fork a CONCSTATE program.
+-- Requires a proof that all resources are unlocked.
+Fork: {m: Type -> Type} ->
+        (prf: allUnlocked rsin = True) ->
         (prog: Eff m [CONCSTATE rsin m] ()) ->
-        ConcState m (REnv rsin) (REnv rsin) ()
-\end{verbatim}
+        ConcState m
+            (REnv rsin)
+            (REnv rsin)
+            ()
+
+\end{BVerbatim}
 
 \subsection{The handler(s)}
 
-Perhaps the most beautiful thing about Effects is the ability to define
-different handlers. %% @TODO: oh man...
+One of the main benefits of using algebraic effects for writing programs with
+side-effects is the ability to write different \emph{handlers} for running the
+effectful code in different contexts.
 
-We present here as an example the "standard" \code{IO} handler. Once again, the
+We present here as an example a standard \code{IO} handler. Once again, the
 handling of \code{Lock}, \code{Unlock}, \code{Read}, \code{Write} is
-straightforward:
+straightforward, here is how reading and locking is performed:
 
-\begin{verbatim}
+\begin{BVerbatim}
+
 instance Handler (ConcState IO) IO where
-    handle env (Write ind val prf) k = do
-        let newenv = envWrite env ind val prf
-        k newenv ()
     handle env (Read ind prf) k = do
-        let val = envLookup env ind prf
+        let lockref = envLookup env ind prf
+        val <- Locks.read lockref
         k env val
-    handle env (Lock ind prf_elem prf_unlocked) k = do
-        let newenv = envLock env ind prf_elem
+    handle env (Lock ind _) k = do
+        ref <- Locks.get_lock ind
+        let newenv = envLock ref env ind
         k newenv ()
-    handle env (Unlock ind prf) k = do
-        let newenv = envUnlock env ind prf
-        k newenv ()
-\end{verbatim}
+
+\end{BVerbatim}
+
+The \code{Locks.*} functions use our small locking library (which provides no
+safety guarantees) to perform the low-level operations.
 
 Note that \code{env} and \code{newenv} here are environments in the
-\code{ConcEnv} sense, NOT in the Effects sense, i.e. environments corresponding
-to the shared resources in the \code{ConcState}.
+\code{ConcEnv} sense, \emph{not} in the Effects sense, i.e. environments
+corresponding to the shared resources in the \code{ConcState}.
 
-\code{Fork} is perhaps a bit more cryptic and magical:
+The handling of \code{Fork} is perhaps a bit more cryptic and magical:
 
-\begin{verbatim}
-    handle env (Fork prf prog) k = do
-        let _ = fork (run [env] prog)
+\begin{BVerbatim}
+
+    handle env (Fork _ prog) k = do
+        _ <- fork (run [env] prog)
         k env ()
-\end{verbatim}
+
+\end{BVerbatim}
 
 Let us dissect it:
 
@@ -289,53 +333,191 @@ Let us dissect it:
         a program of type \code{IO ()} to be executed in a new thread.
     \item \code{run} is part of the Effects library, it is used to run an
     effectful program and has the type:
-    \begin{verbatim}
-run : Applicative m => Env m xs -> (prog: EffM m xs xs' a) -> m a
-    \end{verbatim}
+    \begin{Verbatim}
+run : Applicative m => Env m xs ->
+                       (prog: EffM m xs xs' a) ->
+                       m a
+    \end{Verbatim}
     so the term \code{[env]} \emph{is} now actually an Effects \code{Env}.
 \end{itemize}
 
 Furthermore, now it can be seen why we parametrised \code{ConcState} over
 a computational context \code{(m: Type -> Type)}: we want to ensure that we only
 fork \code{CONCSTATE} subprograms which will be run in the same computational
-context as the parent \code{CONCSTATE} program. [Note: I believe it might be
-possible to avoid this, but I did not explore this enough as it was not the
-main concern.]
-
-Moreover, observe that the only reason we need to run this in an \code{IO}
-monad is because we are using \code{fork}. If, e.g. we changed the handling of
-\code{Fork} to be, e.g. sequential:
-
-\begin{verbatim}
-    handle env (Fork prf prog) k = do
-        let _ = run [env] prog
-        k env ()
-\end{verbatim}
-
-we could have a generic instance which could be run in any \code{Applicative
-m}\footnote{The restriction that \code{m} must be an instance of
-\code{Applicative} can't be dropped, because of the type of \code{run}}.
+context as the parent \code{CONCSTATE} program.\footnote{It might be possible to avoid
+this by having the computational context as an implict argument everywhere, but
+this seemed to confuse the current Idris compiler and since it's a minor detail
+we did not investigate this possibility further.}
 
 Finally, we can define the basic actions as standalone effectful programs
-(using the implicit lifting used in the Effects library). Here is how
-\code{write} and \code{efork}\footnote{the \code{e} prefix is used to avoid
-confusion with the IO primitive \code{fork}} are defined:
+(using the implicit lifting existing in the Effects library).
+As an example, here is how \code{write} is defined:
 
-\begin{verbatim}
-write: (ind: Fin n) -> (val: ty) -> (ElemAtIs ind (RState (S k) ty) rsin) ->
-            Eff m [(CONCSTATE rsin m)] ()
+\begin{BVerbatim}
+
+write: (ind: Fin n) -> (val: ty) ->
+                       (prf: ElemAtIs ind (RState (S k) ty) rsin) ->
+                       Eff m [CONCSTATE rsin m] ()
 write i val el_prf = (Write i val el_prf)
 
-efork: {rsin: Vect n ResState} -> (prf: AllUnlocked rsin) ->
-            Eff m [CONCSTATE rsin m] () -> Eff m [CONCSTATE rsin m] ()
-efork prf prog = (Fork prf prog)
-\end{verbatim}
+\end{BVerbatim}
 
-@TODO: mention that it would be possible to add some tactics here so that
-explicit proofs would not be needed.
+Moreover, in \code{efork}\footnote{the \code{e} prefix is used to avoid
+confusion with the IO primitive \code{fork}}, using some of the available proof
+automation in Idris, we can relieve the programmer a bit from having to provide
+\emph{all} of the proofs:
 
-\subsection{The problems}
+\begin{BVerbatim}
 
-\emph{@TODO: Figure out: if we didn't have other problems, would the
-restriction to a single computational context be an issue? Can effects switch
-computational contexts during execution?}
+efork: {auto prf: allUnlocked rsin = True} ->
+        (prog: Eff m [CONCSTATE rsin m] ()) -> Eff m [CONCSTATE rsin m] ()
+efork prog {prf} = (Fork prf prog)
+
+\end{BVerbatim}
+
+Here the implicit argument \code{\{auto prf: ..\}} tells Idris to atempt to
+fill that type automatically and the current proof search is powerful enough to
+do so in our simple usecases.
+
+\subsection{Example: multithreaded counter}
+
+As a proof that our implementation actually works, we present a simple
+multithread counter example.
+
+The main building block for it is the following function:
+
+\begin{BVerbatim}
+
+bump_ith_val: (i: Fin n) ->
+              (prf: ElemAtIs i (RState q Int) rsin) ->
+              Eff IO [CONCSTATE rsin IO] ()
+bump_ith_val i prf = do
+    lock i
+    val <- read i ?prf
+    write i (val + 1) ?prf
+    unlock i ?prf
+
+\end{BVerbatim}
+
+Since we didn't implement any proof search for the \code{ElemAtIs} proofs,
+we are forced to fill in the \code{?prf} entries ourselves.
+
+Luckily this is as simple as replacing them with \code{(bump\_elem prf)},
+where \code{bump\_elem} simply updates the \code{ElemAtIs} proof to describe
+a locked variable at the ith position.
+
+\begin{BVerbatim}
+
+bump_elem: ElemAtIs i (RState k Int) rsin ->
+           ElemAtIs i (RState (S k) Int) (bump_lock i rsin)
+bump_elem ElemAtIsHere = ElemAtIsHere
+bump_elem (ElemAtIsThere ys) = ElemAtIsThere (bump_elem ys)
+
+\end{BVerbatim}
+
+Unfortunately, this is still not sufficient to convince Idris that our
+function typechecks, because we touched the resource states (by locking and
+unlocking) and hence type checking will fail with the following error:
+
+\begin{BVerbatim}
+
+Can't unify
+    EffM IO [CONCSTATE (bump_lock i rsin) IO]
+            [CONCSTATE (replaceAt i (RState q Int) (bump_lock i rsin)) IO]
+            ()
+with
+    EffM IO [CONCSTATE (bump_lock i rsin) IO]
+            [CONCSTATE rsin IO]
+            ()
+
+Specifically:
+    Can't unify
+        replaceAt i (RState q Int) (bump_lock i rsin)
+    with
+        rsin
+
+\end{BVerbatim}
+
+
+However if we look at the type signature of \code{bump\_ith\_val}, then we
+see that the provided proof
+\begin{Verbatim}
+    ElemAtIs i (RState q Int) rsin)
+\end{Verbatim}
+actually ensures that if we place the value \code{RState q Int} back into
+\code{rsin}, then \code{rsin} is not changed. Hence we fix this problem
+by proving help to the typechecker via a simple proof rewriting tactic, i.e.
+we replace the line
+\begin{Verbatim}
+    unlock i (bump_elem prf)
+\end{Verbatim}
+with
+\begin{Verbatim}
+    rewrite (lockUnlockPreservePrf prf) in (unlock i (bump_elem prf))
+\end{Verbatim}
+where \code{lockUnlockPreservePrf} uses \code{prf} to produce an equality proof
+of the fact that:
+\begin{Verbatim}
+replaceAt i (RState q Int) (bump_lock i rsin) = rsin
+\end{Verbatim}
+
+which then makes the typecheker happy.
+
+Having this function now makes it easy to write some counter programs, here is
+a trivial example:
+
+\begin{BVerbatim}
+
+bump_first_val: Eff IO [CONCSTATE (RState l Int :: rsin) IO] ()
+bump_first_val = bump_nth_val 0 ElemAtIsHere
+
+wait_until_equals: Int ->
+                   Eff IO [CONCSTATE (RState Z Int :: rsin) IO] Int
+wait_until_equals val = do
+    lock 0
+    res <- read 0 ElemAtIsHere
+    unlock 0 ElemAtIsHere
+    if val == res
+        then return val
+        else wait_until_equals val
+
+increment_first_val: (times: Nat) ->
+    Eff IO [CONCSTATE (RState Z Int :: rsin) IO] Int
+increment_first_val times = do
+    _ <- mapE efork $ replicate times bump_first_val
+    wait_until_equals times
+
+\end{BVerbatim}
+
+
+Although \code{wait\_until\_equals} might seems a bit suspicious, it is crucial
+since we don't know how the thread execution will be scheduled and the only way
+to figure out whether execution has finished is to have some kind of a signal
+set by each thread, which in this case coincides with the counting.
+
+This approach in fact could be used to implement a generic pattern for
+signalling, where each thread increments some special value to mark the end of
+its execution.
+
+It should be also noted that \code{wait\_until\_equals} is non-total since
+it needs to refer to some "external" state about which we can't reason using
+only the information passed to the function. Morever, we would actually have to
+assume unbounded nondeterminism in order for this to be provably total, again
+due to the fact that we don't know how long thread execution will be delayed,
+but we believe it to always happen eventually.
+
+Fianlly, we have the bit of code which obtains the \code{LockRef}s and executes
+our effectful program:
+
+\begin{BVerbatim}
+
+main: IO ()
+main = do
+    [lockref] <- Locks.init_locks [0]
+    let res0 = resource 0 lockref
+    val <- run [Extend res0 Empty] $ increment_first_val 1000
+    putStr "The result is: "
+    print val
+
+\end{BVerbatim}
+

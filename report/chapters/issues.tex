@@ -1,0 +1,128 @@
+\section{Issues with the implementation}
+
+We now discuss the two main issues with our implementation of the
+\code{ConcState} effect.
+
+\subsection{The minor issue: proof terms}
+
+The cost of enforcing safe concurrent access at the type level is the increase
+in complexity of the types signatures. In particular, as we have seen in the
+examples, the user (i.e.~the programmer) of the effect is still expected to
+provide proofs of resource membership.
+
+What's worse is that non-trivial combinations of the \code{ConcState} actions
+are sufficient to confuse the type checker, hence it becomes hard to write
+generic functions (such as the {\code{bump\_ith\_val}), because it also
+involes manual proving.
+
+It would be quite easy to add proof automation which would resolve at least
+most of the trivial cases (such as plain membership). However, the proof
+automation could only work as long as it is able to keep up with the complexity
+of the ways in which resource access is composed. This is very important
+e.g.~in a database or an OS setting where lock usage can become extremely
+complicated, yet it is crucial to provide safety and liveliness guarantees.
+
+\subsection{The major issue: composition with other effects}
+
+Finally, we come back to the promised discussion of problems related to
+\code{Fork}. So far our examples were simple enough so as not to reveal any
+issues with the forking action.
+
+However, consider what would happen if we tried to fork a program, which is
+using some other effect together with \code{CONCSTATE}. As an example we
+present this silly code:
+
+\begin{BVerbatim}
+
+hello_in_a_fork: Eff IO [CONCSTATE rsin IO, STDIO] ()
+hello_in_a_fork = do
+    _ <- efork (putStrLn "Hello")
+    return ()
+
+\end{BVerbatim}
+
+Firstly, this code will fail to typecheck with the following error:
+
+\begin{BVerbatim}
+
+Can't unify
+    Eff e [STDIO] ()
+with
+    Eff IO [CONCSTATE rsin IO] ()
+
+Specifically:
+    Can't unify
+        ()
+    with
+        REnv rsin
+
+\end{BVerbatim}
+
+and it is obvious why this is so if we look again at the type of \code{efork}:
+
+\begin{BVerbatim}
+
+efork: {auto prf: allUnlocked rsin = True} ->
+        (prog: Eff m [CONCSTATE rsin m] ()) ->
+        Eff m [CONCSTATE rsin m] ()
+efork prog {prf} = (Fork prf prog)
+
+\end{BVerbatim}
+
+We specified that the to-be-forked program only uses the \code{CONCSTATE}
+effect, so the typecheker validly disagrees with the usage of \code{STDIO}.
+
+It seems the "fix" for this is obvious: specify in the type that
+\code{CONCSTATE} is simply an element of the available effects.
+
+However this approach breaks down when we have to implement a handler for
+\code{efork}. Consider again the handler code:
+
+\begin{BVerbatim}
+
+    handle env (Fork _ prog) k = do
+        _ <- fork (run [env] prog)
+        k env ()
+
+\end{BVerbatim}
+
+The problem here is that we \emph{only} have access to the environment
+(\code{env}) of the respective effect that is being handled, i.e.
+\code{ConcState}. However, in order to execute an effectful program with
+multiple effects, we would need to have access to their respective environments
+too.
+
+Hence, at least using our straight-forward approach, it seems it is impossible
+(in the current Effects library) to write a handler for \code{Fork} which would
+accept effectful programs with multiple effects.
+
+In fact, this is a known implementation issue described in the
+Effects~\cite[p.~12]{effects-idr} paper:
+
+\begin{quote}
+\emph{
+Another weakness which we hope to address is that mixing control and resource
+effects is a challenge. For example, we cannot currently thread state through
+all branches of a non-deterministic search. If we can address this, it may be
+possible to represent more sophisticated effects such as co-operative
+multithreading, or even partiality. One way to tackle this problem could be to
+introduce a new method of the Handler class which manages resources more
+precisely, with a default implementation calling handle.
+}
+\end{quote}
+
+In the specific case of handling \code{Fork} it would be sufficient to have
+access to all of the environments in the \code{handle} function, because this
+would allow us to use the earlier described "fix" (changing the type of
+\code{Fork}) and then writing something like:
+
+\begin{BVerbatim}
+
+    handle' all_environments (Fork _ prog) k = do
+        _ <- fork (run all_environments prog)
+        k env ()
+
+\end{BVerbatim}
+
+which would then allow us to fork \code{CONCSTATE} programs composed with any
+other effects.
