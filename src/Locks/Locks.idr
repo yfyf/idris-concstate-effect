@@ -21,18 +21,17 @@ write (MkLockRef h) val = do
     _ <- mkForeign (FFun "write_locked" [FInt, FInt] FInt) h val
     return ()
 
-
-initialise_resources: List Int -> IO ()
-initialise_resources rs = do
-    traverse (\x => do
-        h <- get_lock x
-        write h 0
-        release_lock h
-        return ()) rs
-    return ()
-
 read : LockRef -> IO Int
 read (MkLockRef h) = mkForeign (FFun "read_locked" [FInt] FInt) h
+
+init_lock: Int -> IO LockRef
+init_lock i = do
+        _ <- mkForeign (FFun "init_lock" [FInt] FInt) i
+        return (MkLockRef 0)
+
+init_locks: List Int -> IO (List LockRef)
+init_locks rs = do
+    traverse init_lock rs
 
 -- Some tests
 

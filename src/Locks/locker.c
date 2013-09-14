@@ -13,17 +13,36 @@ int debug(char* str) {
     return 0;
 }
 
-int get_lock(int num) {
-    int fd;
+int get_path(char* buff, int id) {
+    sprintf(buff, "/tmp/idris-resource-%d", id);
+    return 0;
+}
 
+int open_file(int id) {
+    int fd;
     char path[100];
-    sprintf(path, "/tmp/idris-resource-%d", num);
+
+    get_path(path, id);
 
     if ((fd = open(path, O_CREAT | O_RDWR, 0666)) < 0) {
         printf("Failed to open file");
         // can't be bothered to handle failure in Idris
         exit(EXIT_FAILURE);
     }
+    return fd;
+}
+
+int init_lock(int id) {
+    char path[100];
+    get_path(path, id);
+    remove(path);
+    return 0;
+}
+
+int get_lock(int id) {
+    int fd;
+    fd = open_file(id);
+
     if (flock (fd, LOCK_EX) < 0) {
         printf("Locking failed");
         exit(EXIT_FAILURE);
