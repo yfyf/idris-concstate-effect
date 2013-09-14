@@ -1,19 +1,32 @@
-\section{The previous work}
+\section{Previous work}
 
 My work mainly builds upon Edwin Brady's and Kevin Hammond's work on managing
-concurrent resources in Idris and a general framework for handling effectful
-programs.
+concurrent resources in Idris~\cite{cbconc-fi} and Brady's Effects
+library~\cite{effects-idr} for programming using algebraic effects in Idris.
 
-\subsection{The concurrent resource management eDSL}
+\subsection{A concurrent resource management eDSL}
 
-In the "Correct-by-Construction Concurrency"~\cite{cbconc-fi} paper, an
+In the "Correct-by-Construction Concurrency" (CbC)~\cite{cbconc-fi} paper, an
 embedded domain specific language for managing concurrent resources using
 ordered locks is implemented, which ensures thread-safe and deadlock-free usage
 of resources, which is formally proved in the paper.
 
+The implementation of our effect closely follows the way shared resource usage
+was modelled in the CbC paper.
+
 \subsection{Algebraic Effects}
 
-@TODO: talk about Algebraic Effects in general and explain the main concepts of
-the Effects library in Idris.
+Algebraic effects is a relatively new approach to handling computation with
+effects. From a pragmatic point of view, one could see algebraic effects as a
+slightly simplified and more useful approach to model effectful computation than
+monads. This is because of two reasons: a single algebraic effect can have many
+\emph{handlers} which determine the actual execution of the effect, hence
+making effects very re-usable and modular. Moreover, algebraic effects compose
+more easily, unlike monads where one has to often take explicit care of the
+ordering and use monad transformers to deal with non-trivial compositions.
 
+For more information on algebraic effects we refer the reader to Andrej Bauer's
+and Matija Pretnar's implementation of \texttt{Eff}~\cite{eff} and also Edwin Brady's work~\cite{effects-idr}.
 
+In this paper we use the algebraic effects as they are implemented in the
+Effects library of Idris.

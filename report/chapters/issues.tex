@@ -1,9 +1,9 @@
-\section{Issues with the implementation}
+\section{Issues}
 
 We now discuss the two main issues with our implementation of the
 \code{ConcState} effect.
 
-\subsection{The minor issue: proof terms}
+\subsection{Proof terms}
 
 The cost of enforcing safe concurrent access at the type level is the increase
 in complexity of the types signatures. In particular, as we have seen in the
@@ -22,7 +22,7 @@ of the ways in which resource access is composed. This is very important
 e.g.~in a database or an OS setting where lock usage can become extremely
 complicated, yet it is crucial to provide safety and liveliness guarantees.
 
-\subsection{The major issue: composition with other effects}
+\subsection{Composition with other effects}
 
 Finally, we come back to the promised discussion of problems related to
 \code{Fork}. So far our examples were simple enough so as not to reveal any

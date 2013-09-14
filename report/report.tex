@@ -3,7 +3,6 @@
 \usepackage{url}
 \usepackage{fancyvrb}
 \usepackage{hyperref}
-\usepackage{listings}
 \usepackage[parfill]{parskip}
 
 \RecustomVerbatimEnvironment{BVerbatim}{BVerbatim}{%
@@ -14,7 +13,7 @@
 
 \newcommand{\Idris}{\textsc{Idris}}
 \newcommand{\version}{0.9.9}
-\newcommand{\commit}{abcd}
+\newcommand{\commit}{\texttt{80007949a073}}
 \newcommand{\code}{\texttt}
 
 
@@ -35,9 +34,9 @@
     concurrent resources in Idris described in \cite{cbconc-fi} into an
     algebraic effect using the Effects library described in \cite{effects-idr}.
 
-    The result is twofold: we succsefully obtain an effect which provides the
-    the same kind of functionality and safety guarantees as the original eDSL,
-    however we do not succeed in making the effect \emph{composable} with
+    The result is twofold: we successfully obtain an effect which provides the
+    same kind of functionality and safety guarantees as the original eDSL,
+    however we do not succeed in making the effect \emph{fully} composable with
     other effects.
 \end{abstract}
 
@@ -47,7 +46,7 @@
 \input{chapters/issues}
 \input{chapters/conclusions}
 
-\bibliographystyle{alpha}
+\bibliographystyle{plain}
 \bibliography{literature.bib}
 
 \end{document}

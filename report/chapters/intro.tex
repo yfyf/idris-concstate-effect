@@ -11,6 +11,7 @@ Hammond.
 
 The full code is available at
 \url{https://github.com/yfyf/idris-concstate-effect}.
+It has been tested to work with Idris version \version.
 
 \subsection{Motivation}
 
@@ -55,7 +56,7 @@ undecidable (which in addition signals a significant increase in complexity).
 The good part of this is that you can describe your data with "arbitrary"
 precision. A typical example of a data structure possible with dependent types
 is a fixed-length list, i.e. a vector. Which could be expressed as
-a Haskell-style typeclass as follows:
+a Haskell-style GADT as follows:
 
 \begin{BVerbatim}
 
@@ -85,14 +86,21 @@ head (x::xs) = x
 
 \end{BVerbatim}
 
+A general introduction to dependent types can be found in
+\cite{dependent-types-tut}.
+
 \subsection{Idris}
 
-Idris is a research language with Dependent Types conceived by Edwin Brady at
-the University of St Andrews. Idris is influenced by Haskell and tries to be a
-general purpose language aimed at systems programming (via easy interfacing
-with C, compilation to multiple backends (C, JavaScript, Java) and various
-performance optimisations).
+\Idris{} is a research language with full Dependent Types conceived by Edwin
+Brady at the University of St Andrews. Idris is influenced by Haskell and tries
+to be a general purpose language aimed at systems programming (via easy
+interfacing with C, compilation to multiple backends (C, JavaScript, Java) and
+various performance optimisations).
 
 Since my goal was to solve a practical problem of making it easier to work with
 resources in a concurrent setting, Idris, due to its aims, seemed as a perfect
 experimentation platform.
+
+For an introduction to Idris please consult the Idris
+tutorial~\cite{idris-tutorial}. Finer details about the core Idris can be found
+in the implementation paper~\cite{idris-impl}.

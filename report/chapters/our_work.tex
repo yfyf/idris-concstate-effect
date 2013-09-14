@@ -22,15 +22,15 @@ Due to exactly the same reasons, although we might want to have forking as an
 effect on its own (which e.g. executes an effectful program in some "parallel"
 computational context, allowing to write handlers which perform different
 interleavings and etc.), this is not possible if we want to provide the safety
-guarantees. (And in fact forking induces additional and more fundamental
-issues, as we will see latter).
+guarantees. (And in fact forking induces additional complications, as we will
+see latter).
 
 \subsection{The predicates}
 
 As a consequence of the considerations, we model the management of a collection
 of resources in a very similarly to to how it was done in the CbC paper.
 
-Our first ingredient in constructing the effect is the type for
+Our first ingredient in constructing the effect is a type for
 \emph{representing} the state of a resource, which will be used to in
 describing the various safety conditions.
 
@@ -109,10 +109,11 @@ data Resource: ResState -> Type where
 It is parametrised over a lock reference \code{LockRef}, which will be used to
 access the locks and resource data via a small library we implemented for
 demonstration purposes. It is also parametrised over an explicit lock count,
-since our library doesn't actually support nested locks, so we only keep the
-lock count for simulation purposes.
+because our library doesn't support nested locks. We only keep the
+lock count to describe how nested locking could be handled with a proper
+interpreter.
 
-Furthermore, we combine the interprations of the resource states (i.e.
+Furthermore, we combine the interpretations of the resource states (i.e.
 \code{Vect n ResState}) into a resource \emph{environment} \code{REnv}:
 
 \begin{BVerbatim}
@@ -158,11 +159,12 @@ providing a proof that the element to which we are writing is locked:
 
 Note: although the \code{REnv} and, e.g. \code{envLookup} are implemented in a
 way which directly depends on our \code{Resource} interpretation and hence
-make it seem impossible to provide other interpretations, this can be easily
-abstracted using e.g. a typeclass for such interpretations, but we avoided this
-approach for simplicity and flexibility\footnote{In particular, this induces more
-tedious work for writing alternative versions of the \code{env*} functions, but
-allows one to have any kind of interpreter functions.}.
+might make it seem impossible to provide other interpretations, this can be
+easily abstracted using e.g. a generic constructor for the interpretations,
+but we avoided this approach for simplicity and flexibility\footnote{
+    In particular, this induces more tedious work for writing alternative versions
+    of the \code{env*} functions, but allows one to have any kind of interpreter
+    functions.}.
 
 \subsection{The effect}
 
@@ -179,8 +181,8 @@ computational context \code{(m: Type -> Type)}:
 [Note: in the code we have actually defined the effect in terms of a more
 general \code{GenConcState} which is also parametrised over a \code{ResState}
 interpretation. Hence \code{ConcState} is just an instance of
-\code{GenConcState} which is using the \code{Resource} interpreter and we use
-it for ease of presentation.]
+\code{GenConcState} which is using the \code{Resource} interpreter. We use
+\code{ConcState} simply for ease of presentation.]
 
 The effect will have 5 actions: \code{Lock}, \code{Unlock}, \code{Read},
 \code{Write} and \code{Fork}.
@@ -189,8 +191,9 @@ The first 4 definitions are rather straightforward and there is little to
 comment on: for each action we ask for a proof of necessary conditions to be
 provided explicitly and ensure that the resource state is updated accordingly.
 
-[Note: for less verbosity, in all of the remaining code, assume there is an
-implicit argument \code{rsin} of type \code{Vect n ResState} where needed.]
+[Note: for less verbosity, assume there is an implicit argument \code{rsin} of
+type \code{Vect n ResState} where needed in the code for the rest of the
+paper.]
 
 \begin{BVerbatim}
 -- Lock a resource.
@@ -198,9 +201,10 @@ implicit argument \code{rsin} of type \code{Vect n ResState} where needed.]
 -- ordered before it are unlocked.
 Lock: (ind: Fin n) ->
       (prf: prevUnlocked ind rsin = True) ->
-      ConcState m (REnv rsin)
-                (REnv (bump_lock ind rsin))
-                ()
+      ConcState m
+          (REnv rsin)
+          (REnv (bump_lock ind rsin))
+          ()
 \end{BVerbatim}
 
 \begin{BVerbatim}
@@ -209,9 +213,9 @@ Lock: (ind: Fin n) ->
 Unlock: (ind: Fin n) ->
         (prf: ElemAtIs ind (RState (S k) ty) rsin) ->
         ConcState m
-                (REnv rsin)
-                (REnv (replaceAt ind (RState k ty) rsin))
-                ()
+            (REnv rsin)
+            (REnv (replaceAt ind (RState k ty) rsin))
+            ()
 \end{BVerbatim}
 
 \begin{BVerbatim}
@@ -255,7 +259,7 @@ A naive choice for the type of a program which fits our description is
 \code{Eff m [CONCSTATE rsin m] ()}, where \code{CONCSTATE} is the
 \emph{concrete} effect for {\code{ConcState}\footnote{In
 particular, this implies that \code{ConcState} and \code{CONCSTATE} will be
-defined mutually recursivly to each other.}}, i.e.~the
+defined mutually recursively to each other.}}, i.e.~the
 instance of the effect for a specific collection of resources\footnote{See the
 Effects paper~\cite[p.~2]{effects-idr} for a more detailed explanation},
 defined as:
@@ -309,8 +313,8 @@ instance Handler (ConcState IO) IO where
 
 \end{BVerbatim}
 
-The \code{Locks.*} functions use our small locking library (which provides no
-safety guarantees) to perform the low-level operations.
+The \code{Locks.*} functions use our locking library (which provides no safety
+guarantees) to perform the low-level operations.
 
 Note that \code{env} and \code{newenv} here are environments in the
 \code{ConcEnv} sense, \emph{not} in the Effects sense, i.e. environments
@@ -379,10 +383,10 @@ Here the implicit argument \code{\{auto prf: ..\}} tells Idris to atempt to
 fill that type automatically and the current proof search is powerful enough to
 do so in our simple usecases.
 
-\subsection{Example: multithreaded counter}
+\subsection{Example: a multithreaded counter}
 
 As a proof that our implementation actually works, we present a simple
-multithread counter example.
+multithreaded counter example.
 
 The main building block for it is the following function:
 
@@ -404,7 +408,7 @@ we are forced to fill in the \code{?prf} entries ourselves.
 
 Luckily this is as simple as replacing them with \code{(bump\_elem prf)},
 where \code{bump\_elem} simply updates the \code{ElemAtIs} proof to describe
-a locked variable at the ith position.
+a locked variable at the $i$th position.
 
 \begin{BVerbatim}
 
@@ -461,7 +465,7 @@ of the fact that:
 replaceAt i (RState q Int) (bump_lock i rsin) = rsin
 \end{Verbatim}
 
-which then makes the typecheker happy.
+which then makes the typechecker happy.
 
 Having this function now makes it easy to write some counter programs, here is
 a trivial example:
@@ -506,7 +510,7 @@ assume unbounded nondeterminism in order for this to be provably total, again
 due to the fact that we don't know how long thread execution will be delayed,
 but we believe it to always happen eventually.
 
-Fianlly, we have the bit of code which obtains the \code{LockRef}s and executes
+Finally, we have the bit of code which obtains the \code{LockRef}s and executes
 our effectful program:
 
 \begin{BVerbatim}

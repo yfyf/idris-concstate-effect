@@ -1,4 +1,35 @@
 \section{Conclusions and possible further work}
 
-@TODO: talk about how the effects library could be extended and why our result
-is "still a good thing" because it doesn't' require a DSL.
+We have succeeded in (re-)implementing type-safe concurrent resource
+management as an algebraic effect in Idris. Despite the issues discussed,
+avoiding the need for a DSL is already a big step forward and shows that we can
+express complicated notions using algebraic effects and dependent types quite
+neatly. Further work obviously includes resolving the discussed issues.
+
+The current proof tactics available in Idris should be sufficient to automate
+most of the theorem proving required for the \code{ConcState} effect and would
+be an interesting challenge to solve.
+
+On the other hand, the problems we faced while implementing a handler for
+\code{Fork} are due to the way the Effects library is currently implemented. It
+would be interesting to explore potential improvements to the library. One
+approach, as suggested by Brady, would be to introduce a more ``low-level''
+\code{handle'} function for the \code{Handle} class, which would allow to
+handle effects within the context of other effects.
+
+This improvement, in addition to hopefully resolving the issues we faced, might
+also enable splitting up the \code{ConcState} effect into smaller effects
+where, e.g., the resources are standalone ``indexed'' \code{STATE}-like effects
+belonging to some group (indexing and grouping would allow to maintain some
+ordering) with the usual state actions and also actions for locking and forking.
+
+An alternative might be to consider forking also as a standalone effect, which,
+when handled, could require other effects to be in some (``safe'') states.
+This however would not be straightforward as it potentially introduces
+cyclic dependencies between different effects and their handlers.
+
+\subsection*{Acknowledgments}
+
+I would like to thank my supervisor Wouter Swierstra for his good-will,
+inspiring comments and patience. I would also like to thank the developers and
+contributors of Idris for their support.
