@@ -5,6 +5,9 @@ This repository contains the code and report about re-implementing the eDSL
 described in the "Correct-by-Construction Concurrency"[1] paper by Edwin Brady
 and Kevin Hammond as an algebraic effect in the Effects[2] library of Idris.
 
+The report PDF can be found
+[here](https://github.com/yfyf/idris-concstate-effect/releases/download/0.0.1/report.pdf).
+
 Running the code
 ----------------
 
@@ -16,7 +19,9 @@ To run the code you will need:
     https://github.com/edwinb/Idris-dev
 
     The last commit I verified it to work with is
-    edwinb/Idris-dev@3a8d9db3d67e. You definitely need version at least 0.9.9,
+    [3a8d9db3d6](https://github.com/edwinb/Idris-dev/commit/3a8d9db3d67e6fd5266ae97e7afb8e0dc0c58b0b).
+    
+    You definitely need version at least 0.9.9,
     but there have been regressions afterwards.
 
 * Unix-like OS:
