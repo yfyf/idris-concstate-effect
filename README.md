@@ -15,14 +15,13 @@ To run the code you will need:
 
 * Idris:
 
-    You will need a developement version of Idris, get it at
-    https://github.com/edwinb/Idris-dev
+    You need Idris version `0.9.9.1` (any earlier version will not do). Easiest
+    way to obtain it is by installing it via cabal:
 
-    The last commit I verified it to work with is
-    [3a8d9db3d6](https://github.com/edwinb/Idris-dev/commit/3a8d9db3d67e6fd5266ae97e7afb8e0dc0c58b0b).
-    
-    You definitely need version at least 0.9.9,
-    but there have been regressions afterwards.
+        cabal update && cabal install idris
+
+    If you encounter problems, try the dev version of Idris and check the
+    [README](https://github.com/edwinb/Idris-dev/blob/master/README).
 
 * Unix-like OS:
 
