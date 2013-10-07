@@ -18,7 +18,7 @@ Hence we are forced to have a combined state (or an ``environment'') for managin
 all the resources, though this is not much of an issue and is essentially the
 same approach which is taken in the CbC paper.
 
-Due to exactly the same reasons, although we might want to have forking as an
+For the same same reasons, although we might want to have forking as an
 effect on its own (which e.g. executes an effectful program in some ``parallel''
 computational context, allowing to write handlers which perform different
 interleavings and etc.), this is not possible if we want to provide the safety
@@ -27,7 +27,7 @@ see latter).
 
 \subsection{The predicates}
 
-As a consequence of the considerations, we model the management of a collection
+As a consequence of these considerations, we model the management of a collection
 of resources in a very similarly to to how it was done in the CbC paper.
 
 Our first ingredient in constructing the effect is a type for
