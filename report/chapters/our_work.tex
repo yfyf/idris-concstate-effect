@@ -14,12 +14,12 @@ thread-safety sprinkled on top. This would be easy to do if we only had
 least in the current Effects library, because effects live in isolation, i.e.
 it's impossible to reference other effects from within the definition of one.
 
-Hence we are forced to have a combined state (or an "environment") for managing
+Hence we are forced to have a combined state (or an ``environment'') for managing
 all the resources, though this is not much of an issue and is essentially the
 same approach which is taken in the CbC paper.
 
 Due to exactly the same reasons, although we might want to have forking as an
-effect on its own (which e.g. executes an effectful program in some "parallel"
+effect on its own (which e.g. executes an effectful program in some ``parallel''
 computational context, allowing to write handlers which perform different
 interleavings and etc.), this is not possible if we want to provide the safety
 guarantees. (And in fact forking induces additional complications, as we will
@@ -252,7 +252,7 @@ However, we need to ensure that the function preserves the state of
 the resources. Hence, instead of an arbitrary function, we want pass an
 effectful program, which leaves the state of resources unchanged.
 
-Furthermore, safely handling values "returned" from a thread is problematic, so
+Furthermore, safely handling values ``returned'' from a thread is problematic, so
 we assume the function output is a unit.
 
 A naive choice for the type of a program which fits our description is
@@ -504,7 +504,7 @@ signalling, where each thread increments some special value to mark the end of
 its execution.
 
 It should be also noted that \code{wait\_until\_equals} is non-total since
-it needs to refer to some "external" state about which we can't reason using
+it needs to refer to some ``external'' state about which we can't reason using
 only the information passed to the function. Morever, we would actually have to
 assume unbounded nondeterminism in order for this to be provably total, again
 due to the fact that we don't know how long thread execution will be delayed,

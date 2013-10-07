@@ -72,7 +72,7 @@ efork prog {prf} = (Fork prf prog)
 We specified that the to-be-forked program only uses the \code{CONCSTATE}
 effect, so the typecheker validly disagrees with the usage of \code{STDIO}.
 
-It seems the "fix" for this is obvious: specify in the type that
+It seems the ``fix'' for this is obvious: specify in the type that
 \code{CONCSTATE} is simply an element of the available effects.
 
 However this approach breaks down when we have to implement a handler for
@@ -113,7 +113,7 @@ precisely, with a default implementation calling handle.
 
 In the specific case of handling \code{Fork} it would be sufficient to have
 access to all of the environments in the \code{handle} function, because this
-would allow us to use the earlier described "fix" (changing the type of
+would allow us to use the earlier described ``fix'' (changing the type of
 \code{Fork}) and then writing something like:
 
 \begin{BVerbatim}

@@ -26,7 +26,7 @@ concurrent algorithms and then translated into an actual implementation.
 
 Naturally, both approaches are quite unsustainable and it is a shame that,
 despite having progressed research in the area quite a bit, most software
-systems are still handling concurrent resources "manually" in practice (e.g.
+systems are still handling concurrent resources ``manually'' in practice (e.g.
 without any hints from the compiler about deadlocks).
 
 Hence the initial aim of this project was to explore advances in programming
@@ -53,7 +53,7 @@ means they can be manipulated as any other term.
 The price one has to pay for this is that type checking can in general become
 undecidable (which in addition signals a significant increase in complexity).
 
-The good part of this is that you can describe your data with "arbitrary"
+The good part of this is that you can describe your data with ``arbitrary''
 precision. A typical example of a data structure possible with dependent types
 is a fixed-length list, i.e. a vector. Which could be expressed as
 a Haskell-style GADT as follows:
@@ -70,7 +70,7 @@ data Vect : Nat -> Type -> Type where
 
 \end{BVerbatim}
 
-which makes it possible to, e.g. describe the standard "list-type" functions
+which makes it possible to, e.g. describe the standard ``list-type'' functions
 such as \code{head} and append (\code{++}) very precisely:
 
 \begin{BVerbatim}
