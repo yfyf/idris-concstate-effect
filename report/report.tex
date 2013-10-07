@@ -34,11 +34,14 @@
 \maketitle
 
 \begin{abstract}
-    This is a report of my attempt to transform the eDSL for managing
-    concurrent resources in Idris described by Edwin Brady~\cite{cbconc-fi}
-    into an algebraic effect using the Effects library~\cite{effects-idr}.
+    This report describes the implementation of an algebraic effect for safe
+    concurrent resource management using locks. The effect is implemented in
+    Idris, a functional language with dependent types, using its Effects
+    library~\cite{effects-idr}. In essence, this work is an attempt to exercise
+    the Effects library and obtain the functionality of an eDSL described by
+    Edwin~Brady and Kevin~Hammond~\cite{cbconc-fi} \emph{without} using a DSL.
 
-    The result is twofold: we successfully obtain an effect which provides the
+    The result is two-fold: we successfully obtain an effect which provides the
     same kind of functionality and safety guarantees as the original eDSL,
     however we do not succeed in making the effect \emph{fully} composable with
     other effects.
