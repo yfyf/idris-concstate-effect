@@ -17,25 +17,27 @@ It has been tested to work with Idris version \version.
 
 Concurrency is a concept which is very hard to simulate in our brains.
 Rephrasing my supervisor: if sequential programs have a linear state space of
-$O(n)$, then concurrent programs have an exponential state space of $O(2^n)$,
-which is perhaps the core issue.
+$O(n)$, then concurrent programs have an exponential state space of $O(2^n)$.
+This is perhaps our main struggle with concurrent code.
 
-Historically, either (unsafe) ad-hoc approaches have been (and mostly still
-are) used or formal models were created for proving the correctness of
-concurrent algorithms and then translated into an actual implementation.
+Historically, concurrent protocols and algorithms were implemented either in an
+(unsafe) ad-hoc manner or formal models were employed for proving the
+correctness and safety properties. In the latter case, a formal descriptions
+is usually ``manually'' translated into an actual implementation. Due to the
+subtle nature of concurrent algorithms, the implementation often turns out to
+be unfaithful to the formal description, resulting in hard to trace bugs.
 
-Naturally, both approaches are quite unsustainable and it is a shame that,
-despite having progressed research in the area quite a bit, most software
-systems are still handling concurrent resources ``manually'' in practice (e.g.
-without any hints from the compiler about deadlocks).
+Naturally, both approaches are quite unsustainable. It is a shame that, despite
+lots of research in related areas, in practice most software systems handle
+concurrent resources without any static safety guarantees (e.g. without any
+hints from the compiler about deadlocks).
 
 Hence the initial aim of this project was to explore advances in programming
-language research which would help us solve these problems. This idea
-crystallised into an attempt to explore the power of Dependent Types, in
-particular, the way they are used in Idris and attempting to use ideas from
-previous work on concurrent resource handling~\cite{cbconc-fi}, combining them
-with a new \emph{effectful}~\cite{eff} approach to handling programs with side
-effects as implemented in the Effects~\cite{effects-idr} library of Idris.
+language research in order to address these problems. This idea crystallised
+into an attempt to leverage the power of dependent types, in particular, the
+way they are used in Idris. Our main goal was to combine previous work on
+concurrent resource handling~\cite{cbconc-fi} in Idris with algebraic effects
+(as they are implemented in the Effects~\cite{effects-idr} library).
 
 \subsection{Dependent Types and type safety}
 
