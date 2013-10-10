@@ -39,26 +39,28 @@ way they are used in Idris. Our main goal was to combine previous work on
 concurrent resource handling~\cite{cbconc-fi} in Idris with algebraic effects
 (as they are implemented in the Effects~\cite{effects-idr} library).
 
-\subsection{Dependent Types and type safety}
+\subsection{Dependent types and type safety}
 
-Normally in programming languages types and values are kept completely
-distinct. The main benefit of this approach is that type inference is much
-simpler and, in fact, decidable.
+Usually, programming languages treat types and values as completely distinct
+entities. Most of the time, types are somewhat ``static'' and can't be
+manipulated much, except for basic constructions, such as products and unions.
 
-However, this means that it is very hard or impossible to precisely
-describe some of the data structures and flows (i.e. relations) of your
-program. In a type system with dependent types, the distinction between values
-and types is blurred and types are promoted to first-class citizens in
-dependently typed programming languages~\cite[p.~3]{idris-tutorial}, which
-means they can be manipulated as any other term.
+Some (mostly functional) languages are more powerful in this respect. For
+example, in Haskell one has polymorphic types and type constructors which act a
+lot like functions: they can take as input multiple type arguments and can be
+partially applied.
 
-The price one has to pay for this is that type checking can in general become
-undecidable (which in addition signals a significant increase in complexity).
+Dependent types are on the opposite side of the spectrum, where the distinction
+between types and values is blurred and it is possible to construct
+\emph{types} which depend on \emph{values}. A more powerful type system allows
+the programmer to more accurately describe both data types and program flow.
+This implies that static checking performed by the compiler can provide greater
+correctness guarantees. In fact, sufficiently precise typing ensures that a
+program which type checks is actually correct.
 
-The good part of this is that you can describe your data with ``arbitrary''
-precision. A typical example of a data structure possible with dependent types
-is a fixed-length list, i.e. a vector. Which could be expressed as
-a Haskell-style GADT as follows:
+A typical example of a data structure possible with dependent types is a
+fixed-length list, i.e. a vector. It can be expressed as a Haskell-style GADT
+as follows:
 
 \begin{BVerbatim}
 
@@ -72,8 +74,8 @@ data Vect : Nat -> Type -> Type where
 
 \end{BVerbatim}
 
-which makes it possible to, e.g. describe the standard ``list-type'' functions
-such as \code{head} and append (\code{++}) very precisely:
+which makes it possible to describe a ``safe'' version of the standard
+list-type function \code{head} and give a precise type for appending (\code{++}):
 
 \begin{BVerbatim}
 
@@ -88,20 +90,25 @@ head (x::xs) = x
 
 \end{BVerbatim}
 
+We can see that the type of \code{head} ensures it is a \emph{total} function
+(on non-empty vectors). This is an example of how dependent types help ensure
+our programs are correct: a run-time error of \code{head} being applied to an
+empty vector is ruled out at compile time, since type unification would simply
+fail in an application of \code{head} on a possibly-empty vector.
+
 For a quick introduction to dependent types and a list of great references we
 refer the reader to Jan Malakhovski's introduction~\cite{deptypes-intro}.
 
 \subsection{Idris}
 
-\Idris{} is a research language with full Dependent Types conceived by Edwin
+\Idris{} is a research language with full dependent types conceived by Edwin
 Brady at the University of St Andrews. Idris is influenced by Haskell and tries
 to be a general purpose language aimed at systems programming (via easy
 interfacing with C, compilation to multiple backends (C, JavaScript, Java) and
 various performance optimisations).
 
-Since my goal was to solve a practical problem of making it easier to work with
-resources in a concurrent setting, Idris, due to its aims, seemed to be a perfect
-experimentation platform.
+Since our goal was to make writing safe \emph{real-world} concurrent code
+easier, Idris was a good match for an experimentation platform.
 
 For an introduction to Idris please consult the Idris
 tutorial~\cite{idris-tutorial}. Finer details about the core Idris can be found
