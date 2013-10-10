@@ -1,6 +1,6 @@
 \section{Previous work}
 
-My work mainly builds upon Edwin Brady's and Kevin Hammond's work on managing
+Our work mainly builds upon Edwin Brady's and Kevin Hammond's work on managing
 concurrent resources in Idris~\cite{cbconc-fi} and Brady's Effects
 library~\cite{effects-idr} for programming using algebraic effects in Idris.
 
@@ -8,8 +8,8 @@ library~\cite{effects-idr} for programming using algebraic effects in Idris.
 
 In the ``Correct-by-Construction Concurrency'' (CbC)~\cite{cbconc-fi} paper, an
 embedded domain specific language for managing concurrent resources using
-ordered locks is implemented, which ensures thread-safe and deadlock-free usage
-of resources, which is formally proved in the paper.
+ordered locks is implemented. The eDSL ensures thread-safe and deadlock-free
+usage of resources, which is formally proved in the paper.
 
 The implementation of our effect closely follows the way shared resource usage
 was modelled in the CbC paper.
@@ -17,16 +17,17 @@ was modelled in the CbC paper.
 \subsection{Algebraic Effects}
 
 Algebraic effects are a relatively new approach to handling computation with
-effects. From a pragmatic point of view, one could see algebraic effects as a
-slightly simplified and more useful approach to model effectful computation than
-monads. This is because of two reasons: a single algebraic effect can have many
+side-effects. From a pragmatic point of view, one could see algebraic effects
+as a more modular and convenient approach to managing effectful code than
+monads. Firstly this is because a single algebraic effect can have many
 \emph{handlers} which determine the actual execution of the effect, hence
-making effects very re-usable and modular. Moreover, algebraic effects compose
-more easily, unlike monads where one has to often take explicit care of the
-ordering and use monad transformers to deal with non-trivial compositions.
+making effects highly re-usable and modular. Secondly, algebraic effects
+compose naturally, unlike monads where one has to often take explicit care of
+the ordering and use monad transformers for composition.
 
 For more information on algebraic effects we refer the reader to Andrej Bauer's
-and Matija Pretnar's implementation of \texttt{Eff}~\cite{eff} and also Edwin Brady's work~\cite{effects-idr}.
+and Matija Pretnar's implementation of \texttt{Eff}~\cite{eff} and also Edwin
+Brady's work~\cite{effects-idr}.
 
 In this paper we use the algebraic effects as they are implemented in the
 Effects library of Idris.
