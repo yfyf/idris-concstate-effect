@@ -6,7 +6,7 @@ described in the "Correct-by-Construction Concurrency"[1] paper by Edwin Brady
 and Kevin Hammond as an algebraic effect in the Effects[2] library of Idris.
 
 The report PDF can be found
-[here](https://github.com/yfyf/idris-concstate-effect/releases/download/0.0.1/report.pdf).
+[here](https://github.com/yfyf/idris-concstate-effect/releases/download/1.0.0/report.pdf).
 
 Running the code
 ----------------
@@ -15,8 +15,8 @@ To run the code you will need:
 
 * Idris:
 
-    You need Idris version `0.9.9.1` (any earlier version will not do). Easiest
-    way to obtain it is by installing it via cabal:
+    You need Idris version `0.9.9.1` (also known to work with `0.9.9.2`, earlier version will not do).
+    Easiest     way to obtain it is by installing it via cabal:
 
         cabal update && cabal install idris
 
