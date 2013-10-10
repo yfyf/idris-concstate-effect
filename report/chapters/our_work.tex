@@ -142,14 +142,15 @@ data Resource: ResState -> Type where
 
 \end{BVerbatim}
 
-It is parametrised over a lock reference \code{LockRef}, which will be used to
-access the locks and resource data via a small library we implemented for
-demonstration purposes. It is also parametrised over an explicit lock count,
-because our library doesn't support nested locks. We only keep the
-lock count to describe how nested locking could be handled with a proper
-interpreter.
+It is parametrised over a lock reference \code{LockRef}. The lock reference is
+obtained by (externally) instantiating the resource and is then used to access
+the locks and resource data. All of this is done via a small \code{Locks}
+library we implemented for demonstration purposes. The resource is also
+parametrised over an explicit lock count, because our library doesn't support
+nested locks. We only keep the lock count to describe how nested locking could
+be handled in a proper implementation.
 
-Furthermore, we combine the interpretations of the resource states (i.e.
+Moving on, we combine the interpretations of the resource states (i.e.
 \code{Vect n ResState}) into a resource \emph{environment} \code{REnv}:
 
 \begin{BVerbatim}
