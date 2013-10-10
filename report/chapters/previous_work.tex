@@ -25,6 +25,39 @@ making effects highly re-usable and modular. Secondly, algebraic effects
 compose naturally, unlike monads where one has to often take explicit care of
 the ordering and use monad transformers for composition.
 
+The most basic example presented in Brady's paper~\cite{effects-idr}
+is that of \code{STATE} effect, which is essentially the same as the familiar
+\code{State} monad in Haskell.
+
+The \code{STATE} effect supports two operations, \code{get} and \code{put}:
+
+\begin{BVerbatim}
+
+get : Eff m [STATE a] a
+put : a -> Eff m [STATE a] ()
+
+\end{BVerbatim}
+
+This should be read as: \code{get} is an effectful operation of \code{STATE a}
+(where \code{a} is the type of the state) which can be executed in any
+computational context \code{m} and produces an output of type \code{a}.
+
+For simplicity the computational context can be assumed to be a monad.
+
+Similarly, \code{put} says that it takes an input of type \code{a}, and
+performs an effectful action on \code{STATE} holding a type \code{a}, producing
+no output (the output type is a unit).
+
+The execution of these operations is then determined by the computation context
+in which they are executed. E.g. one could take the context to be a
+\code{State} monad and write handlers which execute \code{get} and \code{put}
+as the corresponding operations in the \code{State} monad. Alternatively, one
+could write a handler which uses persistent storage for this.
+
+In the Effects library, effectful operations are defined algebraically as data
+types and handlers are defined by providing instances for a \code{Handler}
+typeclass which is parametrised over an effect and a computational context.
+
 For more information on algebraic effects we refer the reader to Andrej Bauer's
 and Matija Pretnar's implementation of \texttt{Eff}~\cite{eff} and also Edwin
 Brady's work~\cite{effects-idr}.

@@ -2,9 +2,9 @@
 
 \subsection{Considerations}
 
-The main goal of this experiment was to implement an effect for concurrent
-resource management in order to make use of the Effects library, in particular
-the composability brought by using algebraic effects in general.
+The main goal of this experiment was to implement an algebraic effect for safe
+concurrent resource management using the Effects library. This approach is
+particularly appealing because we get modularity and composability for free.
 
 Ideally, one would probably want to have an effect similar to \code{STATE}
 for managing an arbitrary resource associated with some state and also
