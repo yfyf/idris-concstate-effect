@@ -8,27 +8,63 @@ particularly appealing because we get modularity and composability for free.
 
 Ideally, one would probably want to have an effect similar to \code{STATE}
 for managing an arbitrary resource associated with some state and also
-thread-safety sprinkled on top. This would be easy to do if we only had
-\emph{one} resource to manage, however since we are dealing with a set of
-\emph{ordered} resources (i.e. like in the CbC paper), this is not possible, at
-least in the current Effects library, because effects live in isolation, i.e.
-it's impossible to reference other effects from within the definition of one.
+thread-safety sprinkled on top. This would be easy to implement if we only had
+\emph{one} resource to manage: we could ensure in the data type that the
+reading or writing operations are only possible when the resource is locked. So
+e.g. the type of \code{get} would become:
 
-Hence we are forced to have a combined state (or an ``environment'') for managing
-all the resources, though this is not much of an issue and is essentially the
-same approach which is taken in the CbC paper.
+\begin{BVerbatim}
+get : Eff m [CONCURRENT_STATE (Locked a)] a
+\end{BVerbatim}
 
-For the same same reasons, although we might want to have forking as an
-effect on its own (which e.g. executes an effectful program in some ``parallel''
+and we would additionally need operations for locking and unlocking
+
+\begin{BVerbatim}
+lock : EffM m
+    [CONCURRENT_STATE (Unlocked a)]
+    [CONCURRENT_STATE (Locked a)]
+    ()
+
+unlock : EffM m
+    [CONCURRENT_STATE (Locked a)]
+    [CONCURRENT_STATE (Unlocked a)]
+    ()
+\end{BVerbatim}
+
+Which should be read as ``the action of (un)locking is an effectful operation
+which flips the effect lock state''.
+
+Finally, we allow forking only when the resource is unlocked
+
+\begin{BVerbatim}
+fork : Eff m [CONCURRENT_STATE (Unlocked a)] ()
+\end{BVerbatim}
+
+Using this approach we obtain thread-safety for a single resource by statically
+ensuring that we only access locked values.
+
+However, the CbC paper considers the more useful and interesting case of
+managing a set of (ordered) resources. Sadly, the above approach does not scale
+to a group of resources, because the data types describe resources in isolation
+and they are also handled in isolation. This means there is no way to describe
+relations between multiple resources in the effect, which is needed to ensure
+safety guarantees.
+
+Hence we are forced to have a combined effectful state (or an ``environment'')
+for managing a group of resources. This is slightly inelegant, but it is not a
+major issue and is essentially the same approach which is taken in the CbC
+paper. We describe this approach in detail in the following sections.
+
+For the same same reasons, although we might want to have forking as an effect
+on its own (which e.g. executes an effectful program in some ``parallel''
 computational context, allowing to write handlers which perform different
-interleavings and etc.), this is not possible if we want to provide the safety
-guarantees. (And in fact forking induces additional complications, as we will
-see latter).
+interleavings), this is not possible if we want to provide safety guarantees.
+In fact forking induces additional complications, as we will see latter.
 
 \subsection{The predicates}
 
-As a consequence of these considerations, we model the management of a collection
-of resources in a very similarly to to how it was done in the CbC paper.
+As a consequence of these considerations, we model the management of a
+collection of resources very similarly to how it was done in the CbC paper.
 
 Our first ingredient in constructing the effect is a type for
 \emph{representing} the state of a resource, which will be used to in
